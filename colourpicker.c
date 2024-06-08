@@ -1,3 +1,4 @@
+/* See LICENSE for copyright details */
 #include <raylib.h>
 #include "util.c"
 

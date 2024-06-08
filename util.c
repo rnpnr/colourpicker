@@ -1,3 +1,4 @@
+/* See LICENSE for copyright details */
 #include <stddef.h>
 #include <stdint.h>
 

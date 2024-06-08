@@ -1,3 +1,4 @@
+/* See LICENSE for copyright details */
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <raylib.h>
