@@ -36,14 +36,18 @@ typedef union {
 } Rect;
 
 enum colour_picker_mode {
-	RGB,
-	HSV,
+	CPM_RGB,
+	CPM_HSV,
+	CPM_LAST
 };
 
 typedef struct {
-	uv2 window_size;
-	Font font;
 	v4 colour;
+	Font font;
+	uv2 window_size;
+	Color bg;
+	Color fg;
+
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 

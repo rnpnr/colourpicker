@@ -47,6 +47,9 @@ main(void)
 {
 	ColourPickerCtx ctx = {0};
 	ctx.window_size = (uv2){.w = 720, .h = 960};
+	ctx.bg = (Color){ .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff };
+	ctx.fg = (Color){ .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff };
+	ctx.colour.a = 1.0;
 
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
