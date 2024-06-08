@@ -10,7 +10,7 @@ typedef struct timespec Filetime;
 static const char *libname = "./libcolourpicker.so";
 static void *libhandle;
 
-typedef void (do_colour_picker_fn)(void);
+typedef void (do_colour_picker_fn)(ColourPickerCtx *);
 static do_colour_picker_fn *do_colour_picker;
 
 static Filetime
@@ -31,6 +31,7 @@ compare_filetime(Filetime a, Filetime b)
 static void
 load_library(const char *lib)
 {
+	dlclose(libhandle);
 	libhandle = dlopen(lib, RTLD_NOW|RTLD_LOCAL);
 	do_colour_picker = dlsym(libhandle, "do_colour_picker");
 }
@@ -38,12 +39,18 @@ load_library(const char *lib)
 int
 main(void)
 {
-	InitWindow(720, 960, "Colour Picker");
+	ColourPickerCtx ctx;
+	ctx.window_size = (uv2){.w = 720, .h = 960};
+
+	SetConfigFlags(FLAG_VSYNC_HINT);
+	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 	load_library(libname);
 
 	Filetime updated_time = get_filetime(libname);
 	while(!WindowShouldClose()) {
-		do_colour_picker();
+		BeginDrawing();
+		do_colour_picker(&ctx);
+		EndDrawing();
 
 		Filetime test_time = get_filetime(libname);
 		if (compare_filetime(test_time, updated_time)) {
