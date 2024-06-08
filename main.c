@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <raylib.h>
+#include <stdio.h>
 #include <sys/stat.h>
 
 #include "util.c"
@@ -10,6 +11,8 @@ typedef struct timespec Filetime;
 
 static const char *libname = "./libcolourpicker.so";
 static void *libhandle;
+
+static const char *fontpath = "/home/rnp/.local/share/fonts/Aozora Mincho Medium.ttf";
 
 typedef void (do_colour_picker_fn)(ColourPickerCtx *);
 static do_colour_picker_fn *do_colour_picker;
@@ -35,17 +38,21 @@ load_library(const char *lib)
 	dlclose(libhandle);
 	libhandle = dlopen(lib, RTLD_NOW|RTLD_LOCAL);
 	do_colour_picker = dlsym(libhandle, "do_colour_picker");
+	if (!libhandle || !do_colour_picker)
+		fprintf(stderr, "Couldn't Hot Reload ColourPicker\n");
 }
 
 int
 main(void)
 {
-	ColourPickerCtx ctx;
+	ColourPickerCtx ctx = {0};
 	ctx.window_size = (uv2){.w = 720, .h = 960};
 
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 	load_library(libname);
+
+	ctx.font = LoadFontEx(fontpath, 128, 0, 0);
 
 	Filetime updated_time = get_filetime(libname);
 	while(!WindowShouldClose()) {
