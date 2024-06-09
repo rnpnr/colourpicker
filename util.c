@@ -13,6 +13,7 @@
 
 typedef int32_t   i32;
 typedef uint32_t  u32;
+typedef uint32_t  b32;
 typedef float     f32;
 typedef double    f64;
 typedef ptrdiff_t size;
@@ -55,6 +56,7 @@ enum colour_picker_flags {
 typedef struct {
 	v4 colour;
 	Font font;
+	i32  font_size;
 	uv2 window_size;
 	Color bg, fg;
 
@@ -65,6 +67,7 @@ typedef struct {
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
+#define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 
 #endif /* _UTIL_C_ */

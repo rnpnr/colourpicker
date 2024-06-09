@@ -1,5 +1,4 @@
 /* See LICENSE for copyright details */
-#include <math.h>
 #include <raylib.h>
 #include <stdio.h>
 
@@ -10,14 +9,38 @@ static const char *mode_labels[CPM_LAST][4] = {
 	[CPM_HSV] = { "H:", "S:", "V:", "A:" },
 };
 
+static f32
+move_towards_f32(f32 current, f32 target, f32 delta)
+{
+	f32 remaining = target - current;
+	f32 result;
+	if (target < current)
+		delta *= -1;
+
+	if (ABS(remaining) < ABS(delta))
+		result = target;
+	else
+		result = current + delta;
+
+	return result;
+}
+
 static v2
-center_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
+left_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
 {
 	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
-	v2 delta = { .w = r.size.w - ts.w, .h = r.size.h - ts.h };
+	v2 delta = { .h = r.size.h - ts.h };
+	return (v2) { .x = r.pos.x, .y = r.pos.y + 0.5 * delta.h, };
+}
+
+static v2
+right_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
+{
+	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
+	v2 delta = { .h = r.size.h - ts.h };
 	return (v2) {
-		.x = r.pos.x + 0.5 * delta.w,
-		.y = r.pos.y + 0.5 * delta.h,
+		.x = r.pos.x + r.size.w - ts.w,
+	        .y = r.pos.y + 0.5 * delta.h,
 	};
 }
 
@@ -110,17 +133,17 @@ fill_hsv_image(Image img, v4 hsv)
 static void
 get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 {
-	if (label)  *label  = cut_rect_left(r, 0.08);
-	if (value)  *value  = cut_rect_right(r, 0.85);
+	if (label) *label = cut_rect_left(r, 0.1);
+	if (value) *value = cut_rect_right(r, 0.87);
 	if (slider) {
 		*slider = cut_rect_middle(r, 0.1, 0.85);
-		slider->size.h *= 0.75;
-		slider->pos.y  += r.size.h * 0.125;
+		slider->size.h *= 0.7;
+		slider->pos.y  += r.size.h * 0.15;
 	}
 }
 
 static void
-do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
+do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 {
 	static i32 held_idx = -1;
 
@@ -128,12 +151,13 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 	get_slider_subrects(r, &lr, &sr, &vr);
 
 	const char *label = mode_labels[ctx->mode][label_idx];
-	v2 fpos = center_text_in_rect(lr, label, ctx->font, 48);
-	DrawTextEx(ctx->font, label, fpos.rv, 48, 0, ctx->fg);
+	v2 fpos = left_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
+	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
 	v2 mouse = { .rv = GetMousePosition() };
+	b32 hovering = CheckCollisionPointRec(mouse.rv, sr.rr);
 
-	if (CheckCollisionPointRec(mouse.rv, sr.rr) && held_idx == -1)
+	if (hovering && held_idx == -1)
 		held_idx = label_idx;
 
 	if (held_idx != -1) {
@@ -190,6 +214,18 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 	DrawRectangleRoundedLinesEx(sr.rr, 1, 0, 3, Fade(BLACK, 0.8));
 
 	{
+		static f32 slider_scale[4] = { 1, 1, 1, 1 };
+		f32 scale_target = 1.5;
+		f32 scale_delta  = (scale_target - 1.0) * 8 * dt;
+
+		b32 should_scale = (held_idx == -1 && hovering) ||
+		                   (held_idx != -1 && label_idx == held_idx);
+		f32 scale = slider_scale[label_idx];
+		scale     = move_towards_f32(scale,
+		                             should_scale? scale_target : 1.0,
+		                             scale_delta);
+		slider_scale[label_idx] = scale;
+
 		f32 half_tri_w = 8;
 		f32 tri_h = 12;
 		v2 t_mid = {
@@ -197,35 +233,36 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 			.y = sr.pos.y,
 		};
 		v2 t_left = {
-			.x = t_mid.x - half_tri_w,
-			.y = t_mid.y - tri_h,
+			.x = (t_mid.x - scale * half_tri_w),
+			.y = (t_mid.y - scale * tri_h),
 		};
 		v2 t_right = {
-			.x = t_mid.x + half_tri_w,
-			.y = t_mid.y - tri_h,
+			.x = (t_mid.x + scale * half_tri_w),
+			.y = (t_mid.y - scale * tri_h),
 		};
 		DrawTriangle(t_right.rv, t_left.rv, t_mid.rv, ctx->fg);
 
 		t_mid.y   += sr.size.h;
-		t_left.y  += sr.size.h + 2 * tri_h;
-		t_right.y += sr.size.h + 2 * tri_h;
+		t_left.y  += sr.size.h + 2 * tri_h * scale;
+		t_right.y += sr.size.h + 2 * tri_h * scale;
 		DrawTriangle(t_mid.rv, t_left.rv, t_right.rv, ctx->fg);
 	}
 
 	const char *value = TextFormat("%0.02f", current);
-	fpos = center_text_in_rect(vr, value, ctx->font, 36);
-	DrawTextEx(ctx->font, value, fpos.rv, 36, 0, ctx->fg);
+	fpos = right_align_text_in_rect(vr, value, ctx->font, 0.9 * ctx->font_size);
+	DrawTextEx(ctx->font, value, fpos.rv, 0.9 * ctx->font_size, 0, ctx->fg);
 }
 
 static void
-do_status_bar(ColourPickerCtx *ctx, Rect r)
+do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 {
 	Rect hex_r  = cut_rect_left(r, 0.5);
 	Rect mode_r = cut_rect_right(r, 0.7);
 
 	v2 mouse = { .rv = GetMousePosition() };
 
-	if (CheckCollisionPointRec(mouse.rv, mode_r.rr)) {
+	b32 mode_collides = CheckCollisionPointRec(mouse.rv, mode_r.rr);
+	if (mode_collides) {
 		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 			if (ctx->mode == CPM_HSV) {
 				ctx->mode = CPM_RGB;
@@ -248,6 +285,11 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 		}
 	}
 
+	const char *label = TextFormat("RGB: ");
+	v2 label_size = {.rv = MeasureTextEx(ctx->font, label, ctx->font_size, 0)};
+	Rect label_r = cut_rect_left(hex_r,  label_size.x / hex_r.size.w);
+	hex_r        = cut_rect_right(hex_r, label_size.x / hex_r.size.w);
+
 	i32 hex_collides = CheckCollisionPointRec(mouse.rv, hex_r.rr);
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
 		const char *new = TextToLower(GetClipboardText());
@@ -256,13 +298,25 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 		ctx->colour.rv = ColorNormalize((Color){ .r = r, .g = g, .b = b, .a = a });
 	}
 
+	static f32 scale_hex = 1.0;
+	f32 scale_target = 1.05;
+	f32 scale_delta  = (scale_target - 1.0) * 8 * dt;
+	scale_hex = move_towards_f32(scale_hex, hex_collides? scale_target : 1.0, scale_delta);
+
 	Color hc = ColorFromNormalized(ctx->colour.rv);
-	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
-	v2 fpos = center_text_in_rect(hex_r, hex, ctx->font, 48);
-	DrawTextEx(ctx->font, hex, fpos.rv, 48, 0, ctx->fg);
+	const char *hex   = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+
+	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
+	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
+
+	fpos = left_align_text_in_rect(hex_r, hex, ctx->font, scale_hex * ctx->font_size);
+	DrawTextEx(ctx->font, hex, fpos.rv, scale_hex * ctx->font_size, 0, ctx->fg);
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 		SetClipboardText(hex);
+
+	static f32 scale_mode = 1.0;
+	scale_mode = move_towards_f32(scale_mode, mode_collides? scale_target : 1.0, scale_delta);
 
 	char *mtext;
 	switch (ctx->mode) {
@@ -270,16 +324,20 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 	case CPM_HSV:  mtext = "HSV"; break;
 	case CPM_LAST: ASSERT(0);     break;
 	}
-	fpos = center_text_in_rect(mode_r, mtext, ctx->font, 48);
-	DrawTextEx(ctx->font, mtext, fpos.rv, 48, 0, ctx->fg);
+	fpos = right_align_text_in_rect(mode_r, mtext, ctx->font, scale_mode * ctx->font_size);
+	DrawTextEx(ctx->font, mtext, fpos.rv, scale_mode * ctx->font_size, 0, ctx->fg);
 }
 
 void
 do_colour_picker(ColourPickerCtx *ctx)
 {
 	ClearBackground(ctx->bg);
-	DrawFPS(20, 20);
 
+#ifdef _DEBUG
+	DrawFPS(20, 20);
+#endif
+
+	f32 dt = GetFrameTime();
 	uv2 ws = ctx->window_size;
 
 	{
@@ -299,7 +357,7 @@ do_colour_picker(ColourPickerCtx *ctx)
 		Rect sb = subregion;
 		sb.size.h *= 0.25;
 
-		do_status_bar(ctx, sb);
+		do_status_bar(ctx, sb, dt);
 
 		Rect r    = subregion;
 		r.pos.y  += 0.25 * ((f32)ws.h / 2);
@@ -322,7 +380,7 @@ do_colour_picker(ColourPickerCtx *ctx)
 		}
 
 		for (i32 i = 0; i < 4; i++) {
-			do_slider(ctx, r, i);
+			do_slider(ctx, r, i, dt);
 			r.pos.y += r.size.h + 0.03 * ((f32)ws.h / 2);
 		}
 	}

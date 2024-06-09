@@ -73,7 +73,8 @@ main(void)
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 
-	ctx.font = LoadFontEx(fontpath, 128, 0, 0);
+	ctx.font      = LoadFontEx(fontpath, 128, 0, 0);
+	ctx.font_size = 44;
 
 	ctx.hsv_img     = GenImageColor(360, 360, BLACK);
 	ctx.hsv_texture = LoadTextureFromImage(ctx.hsv_img);
