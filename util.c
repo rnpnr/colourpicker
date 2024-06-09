@@ -48,13 +48,20 @@ enum colour_picker_mode {
 	CPM_LAST
 };
 
+enum colour_picker_flags {
+	CPF_REFILL_TEXTURE = 1 << 0,
+};
+
 typedef struct {
 	v4 colour;
 	Font font;
 	uv2 window_size;
-	Color bg;
-	Color fg;
+	Color bg, fg;
 
+	Texture2D hsv_texture;
+	Image     hsv_img;
+
+	u32  flags;
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 

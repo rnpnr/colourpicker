@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cflags="-march=native -O0 -Wall"
+cflags="-march=native -ggdb -O0 -Wall"
 ldflags="-lraylib"
 
 # Hot Reloading/Debugging

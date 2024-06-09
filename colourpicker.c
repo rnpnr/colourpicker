@@ -1,6 +1,7 @@
 /* See LICENSE for copyright details */
-#include <stdio.h>
+#include <math.h>
 #include <raylib.h>
+#include <stdio.h>
 
 #include "util.c"
 
@@ -60,80 +61,133 @@ hsv_to_rgb(v4 hsv)
 }
 
 static void
-draw_slider_rect(Rect r, v4 colour, enum colour_picker_mode mode, i32 idx, Color bg)
+fill_hsv_image(Image img, v4 hsv)
 {
-	Color sel, left, right;
-	if (mode != CPM_HSV) {
-		v4 cl     = colour;
-		v4 cr     = colour;
-		cl.E[idx] = 0;
-		cr.E[idx] = 1;
-		left      = ColorFromNormalized(cl.rv);
-		right     = ColorFromNormalized(cr.rv);
-		sel       = ColorFromNormalized(colour.rv);
-	} else {
-		v4 tmp = colour;
-		switch (idx) {
-		case 0: /* H */
-			left  = ColorFromHSV(0,   colour.y, colour.z);
-			right = ColorFromHSV(360, colour.y, colour.z);
-			break;
-		case 1: /* S */
-			left  = ColorFromHSV(colour.x * 360, 0, colour.z);
-			right = ColorFromHSV(colour.x * 360, 1, colour.z);
-			break;
-		case 2: /* V */
-			left  = ColorFromHSV(colour.x * 360, colour.y, 0);
-			right = ColorFromHSV(colour.x * 360, colour.y, 1);
-			break;
-		case 3:
-			tmp.a = 0;
-			left  = ColorFromNormalized(hsv_to_rgb(tmp).rv);
-			tmp.a = 1;
-			right = ColorFromNormalized(hsv_to_rgb(tmp).rv);
-			break;
-		}
-		if (idx != 3) {
-			left.a  = colour.a;
-			right.a = colour.a;
-		}
-		sel = ColorFromNormalized(hsv_to_rgb(colour).rv);
+	f32 param = 0, line_length = (f32)img.height / 3;
+	v2 top = {0}, bottom = {0};
+	bottom.y = line_length;
+
+	/* H component */
+	for (u32 i = 0; i < img.width; i++) {
+		Color rgb = ColorFromHSV(param, hsv.y, hsv.z);
+		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
+		top.x    += 1.0;
+		bottom.x += 1.0;
+		param    += 360.0 / img.width;
 	}
 
-	f32 current = colour.E[idx];
-	Rect srl = cut_rect_left(r, current);
-	Rect srr = cut_rect_right(r, current);
-	DrawRectangleGradientEx(srl.rr, left, left, sel, sel);
-	DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
-	DrawRectangleRoundedLines(r.rr, 1, 0, 12, bg);
+	param     = 0.0;
+	top.x     = 0.0;
+	bottom.x  = 0.0;
+	top.y    += line_length;
+	bottom.y += line_length;
+
+	/* S component */
+	for (u32 i = 0; i < img.width; i++) {
+		Color rgb = ColorFromHSV(hsv.x * 360, param, hsv.z);
+		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
+		top.x    += 1.0;
+		bottom.x += 1.0;
+		param    += 1.0 / img.width;
+	}
+
+	param     = 0.0;
+	top.x     = 0.0;
+	bottom.x  = 0.0;
+	top.y    += line_length;
+	bottom.y += line_length;
+
+	/* V component */
+	for (u32 i = 0; i < img.width; i++) {
+		Color rgb = ColorFromHSV(hsv.x * 360, hsv.y, param);
+		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
+		top.x    += 1.0;
+		bottom.x += 1.0;
+		param    += 1.0 / img.width;
+	}
+}
+
+static void
+get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
+{
+	if (label)  *label  = cut_rect_left(r, 0.08);
+	if (value)  *value  = cut_rect_right(r, 0.85);
+	if (slider) {
+		*slider = cut_rect_middle(r, 0.1, 0.85);
+		slider->size.h *= 0.75;
+		slider->pos.y  += r.size.h * 0.125;
+	}
 }
 
 static void
 do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 {
-	Rect lr = cut_rect_left(r, 0.08);
-	Rect vr = cut_rect_right(r, 0.85);
+	static i32 held_idx = -1;
 
-	Rect sr = cut_rect_middle(r, 0.1, 0.85);
-	sr.size.h *= 0.75;
-	sr.pos.y  += r.size.h * 0.125;
+	Rect lr, sr, vr;
+	get_slider_subrects(r, &lr, &sr, &vr);
 
 	const char *label = mode_labels[ctx->mode][label_idx];
 	v2 fpos = center_text_in_rect(lr, label, ctx->font, 48);
 	DrawTextEx(ctx->font, label, fpos.rv, 48, 0, ctx->fg);
 
-	f32 current = ctx->colour.E[label_idx];
 	v2 mouse = { .rv = GetMousePosition() };
-	if (CheckCollisionPointRec(mouse.rv, sr.rr)) {
+
+	if (CheckCollisionPointRec(mouse.rv, sr.rr) && held_idx == -1)
+		held_idx = label_idx;
+
+	if (held_idx != -1) {
+		f32 current = ctx->colour.E[held_idx];
 		f32 wheel = GetMouseWheelMove();
 		if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
 			current = (mouse.x - sr.pos.x) / sr.size.w;
 		current += wheel / 255;
 		CLAMP(current, 0.0, 1.0);
-		ctx->colour.E[label_idx] = current;
+		ctx->colour.E[held_idx] = current;
+		if (ctx->mode == CPM_HSV)
+			ctx->flags |= CPF_REFILL_TEXTURE;
 	}
 
-	draw_slider_rect(sr, ctx->colour, ctx->mode, label_idx, ctx->bg);
+	if (IsMouseButtonUp(MOUSE_BUTTON_LEFT))
+		held_idx = -1;
+
+	f32 current = ctx->colour.E[label_idx];
+	Rect srl = cut_rect_left(sr, current);
+	Rect srr = cut_rect_right(sr, current);
+
+	if (ctx->mode == CPM_RGB) {
+		Color sel, left, right;
+		v4 cl     = ctx->colour;
+		v4 cr     = ctx->colour;
+		cl.E[label_idx] = 0;
+		cr.E[label_idx] = 1;
+		left      = ColorFromNormalized(cl.rv);
+		right     = ColorFromNormalized(cr.rv);
+		sel       = ColorFromNormalized(ctx->colour.rv);
+		DrawRectangleGradientEx(srl.rr, left, left, sel, sel);
+		DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
+	} else {
+		if (label_idx == 3) { /* Alpha */
+			Color sel   = ColorFromHSV(ctx->colour.x * 360,
+			                           ctx->colour.y, ctx->colour.z);
+			sel.a = ctx->colour.a * 255;
+			Color left  = sel;
+			Color right = sel;
+			left.a  = 0;
+			right.a = 255;
+			DrawRectangleGradientEx(srl.rr, left, left, sel, sel);
+			DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
+		} else {
+			Rect tr    = {0};
+			tr.pos.y  += ctx->hsv_img.height / 3 * label_idx;
+			tr.size.h  = sr.size.h;
+			tr.size.w  = ctx->hsv_img.width;
+			DrawTexturePro(ctx->hsv_texture, tr.rr, sr.rr, (Vector2){0}, 0, WHITE);
+		}
+	}
+
+	DrawRectangleRoundedLinesEx(sr.rr, 1, 0, 12, ctx->bg);
+	DrawRectangleRoundedLinesEx(sr.rr, 1, 0, 3, Fade(BLACK, 0.8));
 
 	{
 		f32 half_tri_w = 8;
@@ -178,6 +232,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 				ctx->colour = hsv_to_rgb(ctx->colour);
 			} else {
 				ctx->mode++;
+				ctx->flags |= CPF_REFILL_TEXTURE;
 				ctx->colour = rgb_to_hsv(ctx->colour);
 			}
 		}
@@ -186,6 +241,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 				ctx->mode = CPM_HSV;
 				ctx->colour = rgb_to_hsv(ctx->colour);
 			} else {
+				ctx->flags |= CPF_REFILL_TEXTURE;
 				ctx->mode--;
 				ctx->colour = hsv_to_rgb(ctx->colour);
 			}
@@ -248,6 +304,22 @@ do_colour_picker(ColourPickerCtx *ctx)
 		Rect r    = subregion;
 		r.pos.y  += 0.25 * ((f32)ws.h / 2);
 		r.size.h *= 0.15;
+
+		if (ctx->flags & CPF_REFILL_TEXTURE) {
+			Rect sr;
+			get_slider_subrects(r, 0, &sr, 0);
+			if (ctx->hsv_img.width != (i32)(sr.size.w + 0.5)) {
+				i32 w = sr.size.w + 0.5;
+				i32 h = sr.size.h * 3;
+				h += 3 - (h % 3);
+				ImageResize(&ctx->hsv_img, w, h);
+				UnloadTexture(ctx->hsv_texture);
+				ctx->hsv_texture = LoadTextureFromImage(ctx->hsv_img);
+			}
+			fill_hsv_image(ctx->hsv_img, ctx->colour);
+			UpdateTexture(ctx->hsv_texture, ctx->hsv_img.data);
+			ctx->flags &= ~CPF_REFILL_TEXTURE;
+		}
 
 		for (i32 i = 0; i < 4; i++) {
 			do_slider(ctx, r, i);
