@@ -1,8 +1,15 @@
 /* See LICENSE for copyright details */
+#ifndef _UTIL_C_
+#define _UTIL_C_
+
 #include <stddef.h>
 #include <stdint.h>
 
-#define ASSERT(c) do { if (!(c)) __builtin_debugtrap(); } while (0);
+#ifdef _DEBUG
+#define ASSERT(c) do { if (!(c)) asm("int3; nop"); } while (0);
+#else
+#define ASSERT(c)
+#endif
 
 typedef int32_t   i32;
 typedef uint32_t  u32;
@@ -52,3 +59,5 @@ typedef struct {
 } ColourPickerCtx;
 
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
+
+#endif /* _UTIL_C_ */

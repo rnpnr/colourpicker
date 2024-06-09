@@ -1,6 +1,7 @@
 /* See LICENSE for copyright details */
 #include <stdio.h>
 #include <raylib.h>
+
 #include "util.c"
 
 static const char *mode_labels[CPM_LAST][4] = {

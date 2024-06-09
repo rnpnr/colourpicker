@@ -7,12 +7,13 @@
 
 #include "util.c"
 
+static const char *fontpath = "/home/rnp/.local/share/fonts/Aozora Mincho Medium.ttf";
+
+#ifdef _DEBUG
 typedef struct timespec Filetime;
 
 static const char *libname = "./libcolourpicker.so";
 static void *libhandle;
-
-static const char *fontpath = "/home/rnp/.local/share/fonts/Aozora Mincho Medium.ttf";
 
 typedef void (do_colour_picker_fn)(ColourPickerCtx *);
 static do_colour_picker_fn *do_colour_picker;
@@ -42,6 +43,24 @@ load_library(const char *lib)
 		fprintf(stderr, "Couldn't Hot Reload ColourPicker\n");
 }
 
+static void
+do_debug(void)
+{
+	static Filetime updated_time;
+	Filetime test_time = get_filetime(libname);
+	if (compare_filetime(test_time, updated_time)) {
+		load_library(libname);
+		updated_time = test_time;
+	}
+
+}
+#else
+
+static void do_debug(void) { }
+#include "colourpicker.c"
+
+#endif /* _DEBUG */
+
 int
 main(void)
 {
@@ -53,20 +72,14 @@ main(void)
 
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
-	load_library(libname);
 
 	ctx.font = LoadFontEx(fontpath, 128, 0, 0);
 
-	Filetime updated_time = get_filetime(libname);
 	while(!WindowShouldClose()) {
+		do_debug();
+
 		BeginDrawing();
 		do_colour_picker(&ctx);
 		EndDrawing();
-
-		Filetime test_time = get_filetime(libname);
-		if (compare_filetime(test_time, updated_time)) {
-			load_library(libname);
-			updated_time = test_time;
-		}
 	}
 }
