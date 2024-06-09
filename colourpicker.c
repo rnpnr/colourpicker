@@ -296,6 +296,8 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 		u32 r, g, b, a;
 		sscanf(new, "%02x%02x%02x%02x", &r, &g, &b, &a);
 		ctx->colour.rv = ColorNormalize((Color){ .r = r, .g = g, .b = b, .a = a });
+		if (ctx->mode == CPM_HSV)
+			ctx->colour = rgb_to_hsv(ctx->colour);
 	}
 
 	static f32 scale_hex = 1.0;
@@ -303,8 +305,12 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 	f32 scale_delta  = (scale_target - 1.0) * 8 * dt;
 	scale_hex = move_towards_f32(scale_hex, hex_collides? scale_target : 1.0, scale_delta);
 
-	Color hc = ColorFromNormalized(ctx->colour.rv);
-	const char *hex   = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+	Color hc;
+	if (ctx->mode == CPM_HSV)
+		hc = ColorFromNormalized(hsv_to_rgb(ctx->colour).rv);
+	else
+		hc = ColorFromNormalized(ctx->colour.rv);
+	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 
 	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
@@ -343,8 +349,8 @@ do_colour_picker(ColourPickerCtx *ctx)
 	{
 		v4 vcolour = ctx->mode == CPM_HSV ? hsv_to_rgb(ctx->colour) : ctx->colour;
 		Color colour = ColorFromNormalized(vcolour.rv);
-		v2  cc = { .x = (f32)ws.w / 2, .y = (f32)ws.h / 4 };
-		DrawCircleSector(cc.rv, 0.6 * cc.x, 0, 360, 69, RED);
+		v2 cc = { .x = (f32)ws.w / 2, .y = (f32)ws.h / 4 };
+		DrawRing(cc.rv, 0.58 * cc.x, 0.6 * cc.x, 0, 360, 69, Fade(BLACK, 0.5));
 		DrawCircleSector(cc.rv, 0.58 * cc.x, 0, 360, 69, colour);
 	}
 
