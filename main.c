@@ -4,6 +4,7 @@
 #include <raylib.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "util.c"
 
@@ -36,11 +37,16 @@ compare_filetime(Filetime a, Filetime b)
 static void
 load_library(const char *lib)
 {
-	dlclose(libhandle);
+	/* NOTE: glibc is buggy gnuware so we need to check this */
+	if (libhandle)
+		dlclose(libhandle);
 	libhandle = dlopen(lib, RTLD_NOW|RTLD_LOCAL);
+	if (!libhandle)
+		fprintf(stderr, "do_debug: dlopen: %s\n", dlerror());
+
 	do_colour_picker = dlsym(libhandle, "do_colour_picker");
-	if (!libhandle || !do_colour_picker)
-		fprintf(stderr, "Couldn't Hot Reload ColourPicker\n");
+	if (!do_colour_picker)
+		fprintf(stderr, "do_debug: dlsym: %s\n", dlerror());
 }
 
 static void
@@ -49,6 +55,7 @@ do_debug(void)
 	static Filetime updated_time;
 	Filetime test_time = get_filetime(libname);
 	if (compare_filetime(test_time, updated_time)) {
+		sync();
 		load_library(libname);
 		updated_time = test_time;
 	}
