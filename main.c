@@ -77,6 +77,10 @@ main(void)
 	ctx.fg = (Color){ .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff };
 	ctx.colour.a = 1.0;
 
+	#ifndef _DEBUG
+	SetTraceLogLevel(LOG_ERROR);
+	#endif
+
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 
