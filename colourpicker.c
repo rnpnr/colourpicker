@@ -5,8 +5,8 @@
 #include "util.c"
 
 static const char *mode_labels[CPM_LAST][4] = {
-	[CPM_RGB] = { "R:", "G:", "B:", "A:" },
-	[CPM_HSV] = { "H:", "S:", "V:", "A:" },
+	[CPM_RGB] = { "R", "G", "B", "A" },
+	[CPM_HSV] = { "H", "S", "V", "A" },
 };
 
 static f32
@@ -40,6 +40,17 @@ right_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
 	v2 delta = { .h = r.size.h - ts.h };
 	return (v2) {
 		.x = r.pos.x + r.size.w - ts.w,
+	        .y = r.pos.y + 0.5 * delta.h,
+	};
+}
+
+static v2
+center_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
+{
+	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
+	v2 delta = { .w = r.size.w - ts.w, .h = r.size.h - ts.h };
+	return (v2) {
+		.x = r.pos.x + 0.5 * delta.w,
 	        .y = r.pos.y + 0.5 * delta.h,
 	};
 }
@@ -133,7 +144,7 @@ fill_hsv_image(Image img, v4 hsv)
 static void
 get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 {
-	if (label) *label = cut_rect_left(r, 0.1);
+	if (label) *label = cut_rect_left(r, 0.08);
 	if (value) *value = cut_rect_right(r, 0.87);
 	if (slider) {
 		*slider = cut_rect_middle(r, 0.1, 0.85);
@@ -151,7 +162,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 	get_slider_subrects(r, &lr, &sr, &vr);
 
 	const char *label = mode_labels[ctx->mode][label_idx];
-	v2 fpos = left_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
+	v2 fpos = center_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
 	v2 mouse = { .rv = GetMousePosition() };
