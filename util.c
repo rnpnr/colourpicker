@@ -55,6 +55,8 @@ enum colour_picker_flags {
 
 typedef struct {
 	v4 colour;
+	struct { v4 items[5]; i32 widx; } colour_stack;
+
 	Font font;
 	i32  font_size;
 	uv2 window_size;
@@ -67,6 +69,7 @@ typedef struct {
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
+#define ARRAY_COUNT(a) (sizeof(a) / sizeof(*a))
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 

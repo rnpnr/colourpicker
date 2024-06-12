@@ -13,16 +13,13 @@ static f32
 move_towards_f32(f32 current, f32 target, f32 delta)
 {
 	f32 remaining = target - current;
-	f32 result;
+
 	if (target < current)
 		delta *= -1;
 
 	if (ABS(remaining) < ABS(delta))
-		result = target;
-	else
-		result = current + delta;
-
-	return result;
+		return target;
+	return current + delta;
 }
 
 static v2
@@ -268,7 +265,9 @@ static void
 do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 {
 	Rect hex_r  = cut_rect_left(r, 0.5);
-	Rect mode_r = cut_rect_right(r, 0.7);
+	Rect mode_r = cut_rect_right(r, 0.85);
+	mode_r.pos.y  += mode_r.size.h * 0.15;
+	mode_r.size.h *= 0.7;
 
 	v2 mouse = { .rv = GetMousePosition() };
 
@@ -311,11 +310,6 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 			ctx->colour = rgb_to_hsv(ctx->colour);
 	}
 
-	static f32 scale_hex = 1.0;
-	f32 scale_target = 1.05;
-	f32 scale_delta  = (scale_target - 1.0) * 8 * dt;
-	scale_hex = move_towards_f32(scale_hex, hex_collides? scale_target : 1.0, scale_delta);
-
 	Color hc;
 	if (ctx->mode == CPM_HSV)
 		hc = ColorFromNormalized(hsv_to_rgb(ctx->colour).rv);
@@ -323,14 +317,19 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 		hc = ColorFromNormalized(ctx->colour.rv);
 	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 
+	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+		SetClipboardText(hex);
+
+	static f32 scale_hex = 1.0;
+	f32 scale_target = 1.05;
+	f32 scale_delta  = (scale_target - 1.0) * 8 * dt;
+	scale_hex = move_towards_f32(scale_hex, hex_collides? scale_target : 1.0, scale_delta);
+
 	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
 	fpos = left_align_text_in_rect(hex_r, hex, ctx->font, scale_hex * ctx->font_size);
 	DrawTextEx(ctx->font, hex, fpos.rv, scale_hex * ctx->font_size, 0, ctx->fg);
-
-	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-		SetClipboardText(hex);
 
 	static f32 scale_mode = 1.0;
 	scale_mode = move_towards_f32(scale_mode, mode_collides? scale_target : 1.0, scale_delta);
@@ -345,6 +344,74 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 	DrawTextEx(ctx->font, mtext, fpos.rv, scale_mode * ctx->font_size, 0, ctx->fg);
 }
 
+static void
+do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
+{
+	v2 mouse = { .rv = GetMousePosition() };
+
+	Rect r    = sa;
+	r.size.h *= 0.12;
+	r.size.w *= 0.7;
+	r.pos.x  += sa.size.w * 0.15;
+	r.pos.y  += sa.size.h * 0.06;
+
+	for (u32 i = 0; i < 5; i++) {
+		i32 cidx  = (ctx->colour_stack.widx + i) % ARRAY_COUNT(ctx->colour_stack.items);
+		v4 colour = ctx->colour_stack.items[cidx];
+		DrawRectangleRounded(r.rr, 1, 0, ColorFromNormalized(colour.rv));
+		DrawRectangleRoundedLinesEx(r.rr, 1, 0, 3.0, Fade(BLACK, 0.8));
+		if (CheckCollisionPointRec(mouse.rv, r.rr) &&
+		    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+			if (ctx->mode == CPM_HSV) {
+				ctx->colour = rgb_to_hsv(colour);
+				ctx->flags |= CPF_REFILL_TEXTURE;
+			} else {
+				ctx->colour = colour;
+			}
+		}
+
+		r.pos.y += sa.size.h * 0.16;
+	}
+
+	r.pos.y = sa.pos.y + sa.size.h - r.size.h;
+	r.pos.x  += r.size.w * 0.1;
+	r.size.w *= 0.8;
+
+	b32 push_collides = CheckCollisionPointRec(mouse.rv, r.rr);
+	static f32 y_shift = 0.0;
+	f32 y_target       = -0.2 * r.size.h;
+	f32 y_delta        = -y_target * 8 * dt;
+
+	y_shift = move_towards_f32(y_shift, push_collides? y_target : 0, y_delta);
+
+	v2 center = {
+		.x = r.pos.x + 0.5 * r.size.w,
+		.y = r.pos.y + 0.5 * r.size.h,
+	};
+	v2 t_top  = {
+		.x = center.x,
+		.y = center.y - 0.3 * r.size.h + y_shift,
+	};
+	v2 t_left = {
+		.x = center.x - 0.3 * r.size.w,
+		.y = center.y + 0.3 * r.size.h,
+	};
+	v2 t_right = {
+		.x = center.x + 0.3 * r.size.w,
+		.y = center.y + 0.3 * r.size.h,
+	};
+
+	DrawTriangle(t_top.rv, t_left.rv, t_right.rv, ctx->fg);
+	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+		v4 colour = ctx->colour;
+		if (ctx->mode == CPM_HSV)
+			colour = hsv_to_rgb(colour);
+		ctx->colour_stack.items[ctx->colour_stack.widx++] = colour;
+		if (ctx->colour_stack.widx == ARRAY_COUNT(ctx->colour_stack.items))
+			ctx->colour_stack.widx = 0;
+	}
+}
+
 void
 do_colour_picker(ColourPickerCtx *ctx)
 {
@@ -357,26 +424,36 @@ do_colour_picker(ColourPickerCtx *ctx)
 	f32 dt = GetFrameTime();
 	uv2 ws = ctx->window_size;
 
+	v2 pad = { .x = 0.05 * (f32)ws.w, .y = 0.05 * (f32)ws.h };
+	Rect upper = {
+		.pos  = { .x = pad.x, .y = pad.y },
+		.size = { .w = (f32)ws.w * 0.9, .h = (f32)ws.h * 0.9 / 2 },
+	};
+	Rect lower = {
+		.pos  = { .x = pad.x, .y = pad.y + (f32)ws.h * 0.9 / 2, },
+		.size = { .w = (f32)ws.w * 0.9, .h = (f32)ws.h * 0.9 / 2 },
+	};
+
 	{
+		Rect ca = cut_rect_left(upper, 0.8);
+		Rect sa = cut_rect_right(upper, 0.8);
+
 		v4 vcolour = ctx->mode == CPM_HSV ? hsv_to_rgb(ctx->colour) : ctx->colour;
 		Color colour = ColorFromNormalized(vcolour.rv);
-		v2 cc = { .x = (f32)ws.w / 2, .y = (f32)ws.h / 4 };
-		DrawRing(cc.rv, 0.58 * cc.x, 0.6 * cc.x, 0, 360, 69, Fade(BLACK, 0.5));
-		DrawCircleSector(cc.rv, 0.58 * cc.x, 0, 360, 69, colour);
+		v2 cc = { .x = ca.pos.x + 0.47 * ca.size.w, .y = ca.pos.y + 0.5 * ca.size.h };
+		DrawRing(cc.rv, 0.4 * ca.size.w, 0.42 * ca.size.w, 0, 360, 69, Fade(BLACK, 0.5));
+		DrawCircleSector(cc.rv, 0.4 * ca.size.w, 0, 360, 69, colour);
+
+		do_colour_stack(ctx, sa, dt);
 	}
 
 	{
-		Rect subregion = {
-			.pos  = { .x = 0.05 * (f32)ws.w, .y = (f32)ws.h / 2, },
-			.size = { .w = (f32)ws.w * 0.9, .h = (f32)ws.h / 2 * 0.9 },
-		};
-
-		Rect sb = subregion;
+		Rect sb = lower;
 		sb.size.h *= 0.25;
 
 		do_status_bar(ctx, sb, dt);
 
-		Rect r    = subregion;
+		Rect r    = lower;
 		r.pos.y  += 0.25 * ((f32)ws.h / 2);
 		r.size.h *= 0.15;
 
