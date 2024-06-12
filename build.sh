@@ -1,12 +1,12 @@
 #!/bin/sh
 
-cflags="-march=native -ggdb -O0 -Wall"
+cflags="-march=native -ggdb -O3 -Wall"
 ldflags="-lraylib"
 
 # Hot Reloading/Debugging
-cflags="$cflags -D_DEBUG"
+#cflags="$cflags -D_DEBUG"
 
-libcflags="$cflags -fPIC"
+libcflags="$cflags -fPIC -flto"
 libldflags="$ldflags -shared"
 
 cc $libcflags colourpicker.c -o libcolourpicker.so $libldflags
