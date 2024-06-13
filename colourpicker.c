@@ -12,14 +12,18 @@ static const char *mode_labels[CPM_LAST][4] = {
 static f32
 move_towards_f32(f32 current, f32 target, f32 delta)
 {
+	f32 result;
 	f32 remaining = target - current;
-
-	if (target < current)
-		delta *= -1;
 
 	if (ABS(remaining) < ABS(delta))
 		return target;
-	return current + delta;
+
+	if (target < current)
+		result = current - delta;
+	else
+		result = current + delta;
+
+	return result;
 }
 
 static v2
@@ -355,13 +359,15 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 	r.pos.x  += sa.size.w * 0.15;
 	r.pos.y  += sa.size.h * 0.06;
 
+	static f32 stack_scales[ARRAY_COUNT(ctx->colour_stack.items)] = { 1, 1, 1, 1, 1 };
+	f32 stack_scale_target = 1.2f;
+	f32 stack_scale_delta  = (stack_scale_target - 1) * 8 * dt;
 	for (u32 i = 0; i < 5; i++) {
 		i32 cidx  = (ctx->colour_stack.widx + i) % ARRAY_COUNT(ctx->colour_stack.items);
 		v4 colour = ctx->colour_stack.items[cidx];
-		DrawRectangleRounded(r.rr, 1, 0, ColorFromNormalized(colour.rv));
-		DrawRectangleRoundedLinesEx(r.rr, 1, 0, 3.0, Fade(BLACK, 0.8));
-		if (CheckCollisionPointRec(mouse.rv, r.rr) &&
-		    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+
+		b32 stack_collides = CheckCollisionPointRec(mouse.rv, r.rr);
+		if (stack_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 			if (ctx->mode == CPM_HSV) {
 				ctx->colour = rgb_to_hsv(colour);
 				ctx->flags |= CPF_REFILL_TEXTURE;
@@ -369,6 +375,21 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 				ctx->colour = colour;
 			}
 		}
+
+		stack_scales[cidx] = move_towards_f32(stack_scales[cidx],
+		                                      stack_collides? stack_scale_target : 1,
+		                                      stack_scale_delta);
+
+		f32 scale = stack_scales[cidx];
+		Rect draw_rect = {
+			.pos = {
+				.x = r.pos.x - (scale - 1) * r.size.w / 2,
+				.y = r.pos.y - (scale - 1) * r.size.h / 2,
+			},
+			.size = { .x = r.size.w * scale, .y = r.size.h * scale },
+		};
+		DrawRectangleRounded(draw_rect.rr, 1, 0, ColorFromNormalized(colour.rv));
+		DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, 0.8));
 
 		r.pos.y += sa.size.h * 0.16;
 	}
@@ -393,11 +414,11 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 		.y = center.y - 0.3 * r.size.h + y_shift,
 	};
 	v2 t_left = {
-		.x = center.x - 0.3 * r.size.w,
+		.x = center.x - 0.3 * r.size.w - 0.75 * y_shift,
 		.y = center.y + 0.3 * r.size.h,
 	};
 	v2 t_right = {
-		.x = center.x + 0.3 * r.size.w,
+		.x = center.x + 0.3 * r.size.w + 0.75 * y_shift,
 		.y = center.y + 0.3 * r.size.h,
 	};
 

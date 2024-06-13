@@ -73,11 +73,19 @@ main(void)
 {
 	ColourPickerCtx ctx = {0};
 	ctx.window_size = (uv2){.w = 720, .h = 960};
-	ctx.bg = (Color){ .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff };
-	ctx.fg = (Color){ .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff };
-	ctx.colour = (v4){ .r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0 };
 	ctx.mode   = CPM_HSV;
 	ctx.flags |= CPF_REFILL_TEXTURE;
+
+	ctx.colour = (v4){ .r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0 };
+
+	ctx.bg = (Color){ .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff };
+	ctx.fg = (Color){ .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff };
+
+	ctx.colour_stack.items[0] = (v4){ .r = 0.04, .g = 0.04, .b = 0.04, .a = 1.00 };
+	ctx.colour_stack.items[1] = (v4){ .r = 0.92, .g = 0.88, .b = 0.78, .a = 1.00 };
+	ctx.colour_stack.items[2] = (v4){ .r = 0.59, .g = 0.11, .b = 0.25, .a = 1.00 };
+	ctx.colour_stack.items[3] = (v4){ .r = 0.11, .g = 0.59, .b = 0.36, .a = 1.00 };
+	ctx.colour_stack.items[4] = (v4){ .r = 0.14, .g = 0.29, .b = 0.72, .a = 1.00 };
 
 	#ifndef _DEBUG
 	SetTraceLogLevel(LOG_ERROR);
