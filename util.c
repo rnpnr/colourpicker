@@ -7,8 +7,10 @@
 
 #ifdef _DEBUG
 #define ASSERT(c) do { if (!(c)) asm("int3; nop"); } while (0);
+#define DEBUG_EXPORT
 #else
 #define ASSERT(c)
+#define DEBUG_EXPORT static
 #endif
 
 typedef int32_t   i32;

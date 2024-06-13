@@ -412,7 +412,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 	}
 }
 
-void
+DEBUG_EXPORT void
 do_colour_picker(ColourPickerCtx *ctx)
 {
 	ClearBackground(ctx->bg);
