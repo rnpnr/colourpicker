@@ -1,4 +1,7 @@
 /* See LICENSE for copyright details */
+#include <emmintrin.h>
+#include <immintrin.h>
+
 #include <raylib.h>
 #include <stdio.h>
 
@@ -90,15 +93,42 @@ rgb_to_hsv(v4 rgb)
 static v4
 hsv_to_rgb(v4 hsv)
 {
-	Color rgba = ColorFromHSV(hsv.x * 360, hsv.y, hsv.z);
-	rgba.a = hsv.a * 255;
-	return (v4){ .rv = ColorNormalize(rgba) };
+	/* f(k(n))   = V - V*S*max(0, min(k, min(4 - k, 1)))
+	 * k(n)      = fmod((n + H * 6), 6)
+	 * (R, G, B) = (f(n = 5), f(n = 3), f(n = 1))
+	 */
+
+	__m128 H, S, V, k, n, six, four, one, zero;
+	six  = _mm_set1_ps(6);
+	four = _mm_set1_ps(4);
+	one  = _mm_set1_ps(1);
+	zero = _mm_set1_ps(0);
+
+	_Alignas(16) f32 nval[4] = {5.0f, 3.0f, 1.0f, 0.0f};
+	n = _mm_load_ps(nval);
+	H = _mm_set1_ps(hsv.x);
+	S = _mm_set1_ps(hsv.y);
+	V = _mm_set1_ps(hsv.z);
+
+	k = _mm_add_ps(n, _mm_mul_ps(six, H));
+	__m128 rem = _mm_round_ps(_mm_div_ps(k, six), _MM_FROUND_TO_NEG_INF);
+	__m128 mod = _mm_sub_ps(k, _mm_mul_ps(rem, six));
+
+	__m128 t = _mm_min_ps(_mm_sub_ps(four, mod), one);
+	t = _mm_max_ps(zero, _mm_min_ps(mod, t));
+	t = _mm_mul_ps(t, _mm_mul_ps(S, V));
+
+	v4 rgba;
+	_mm_storeu_ps(rgba.E, _mm_sub_ps(V, t));
+	rgba.a = hsv.a;
+
+	return rgba;
 }
 
 static void
 fill_hsv_image(Image img, v4 hsv)
 {
-	f32 param = 0, line_length = (f32)img.height / 3;
+	f32 param = 0, line_length = (f32)img.height / 3, tmp;
 	v2 top = {0}, bottom = {0};
 	bottom.y = line_length;
 
@@ -118,27 +148,31 @@ fill_hsv_image(Image img, v4 hsv)
 	bottom.y += line_length;
 
 	/* S component */
+	tmp   = hsv.y;
+	hsv.y = 0;
 	for (u32 i = 0; i < img.width; i++) {
-		Color rgb = ColorFromHSV(hsv.x * 360, param, hsv.z);
+		Color rgb = ColorFromNormalized(hsv_to_rgb(hsv).rv);
 		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
 		top.x    += 1.0;
 		bottom.x += 1.0;
-		param    += 1.0 / img.width;
+		hsv.y    += 1.0 / img.width;
 	}
 
-	param     = 0.0;
+	hsv.y     = tmp;
 	top.x     = 0.0;
 	bottom.x  = 0.0;
 	top.y    += line_length;
 	bottom.y += line_length;
 
 	/* V component */
+	tmp   = hsv.z;
+	hsv.z = 0;
 	for (u32 i = 0; i < img.width; i++) {
-		Color rgb = ColorFromHSV(hsv.x * 360, hsv.y, param);
+		Color rgb = ColorFromNormalized(hsv_to_rgb(hsv).rv);
 		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
 		top.x    += 1.0;
 		bottom.x += 1.0;
-		param    += 1.0 / img.width;
+		hsv.z    += 1.0 / img.width;
 	}
 }
 
@@ -204,9 +238,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 		DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
 	} else {
 		if (label_idx == 3) { /* Alpha */
-			Color sel   = ColorFromHSV(ctx->colour.x * 360,
-			                           ctx->colour.y, ctx->colour.z);
-			sel.a = ctx->colour.a * 255;
+			Color sel   = ColorFromNormalized(hsv_to_rgb(ctx->colour).rv);
 			Color left  = sel;
 			Color right = sel;
 			left.a  = 0;
