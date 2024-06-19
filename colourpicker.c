@@ -97,25 +97,19 @@ hsv_to_rgb(v4 hsv)
 	 * k(n)      = fmod((n + H * 6), 6)
 	 * (R, G, B) = (f(n = 5), f(n = 3), f(n = 1))
 	 */
-
-	__m128 H, S, V, k, n, six, four, one, zero;
-	six  = _mm_set1_ps(6);
-	four = _mm_set1_ps(4);
-	one  = _mm_set1_ps(1);
-	zero = _mm_set1_ps(0);
-
 	_Alignas(16) f32 nval[4] = {5.0f, 3.0f, 1.0f, 0.0f};
-	n = _mm_load_ps(nval);
-	H = _mm_set1_ps(hsv.x);
-	S = _mm_set1_ps(hsv.y);
-	V = _mm_set1_ps(hsv.z);
+	__m128 n    = _mm_load_ps(nval);
+	__m128 H    = _mm_set1_ps(hsv.x);
+	__m128 S    = _mm_set1_ps(hsv.y);
+	__m128 V    = _mm_set1_ps(hsv.z);
+	__m128 six  = _mm_set1_ps(6);
 
-	k = _mm_add_ps(n, _mm_mul_ps(six, H));
-	__m128 rem = _mm_round_ps(_mm_div_ps(k, six), _MM_FROUND_TO_NEG_INF);
-	__m128 mod = _mm_sub_ps(k, _mm_mul_ps(rem, six));
+	__m128 t   = _mm_add_ps(n, _mm_mul_ps(six, H));
+	__m128 rem = _mm_floor_ps(_mm_div_ps(t, six));
+	__m128 k   = _mm_sub_ps(t, _mm_mul_ps(rem, six));
 
-	__m128 t = _mm_min_ps(_mm_sub_ps(four, mod), one);
-	t = _mm_max_ps(zero, _mm_min_ps(mod, t));
+	t = _mm_min_ps(_mm_sub_ps(_mm_set1_ps(4), k), _mm_set1_ps(1));
+	t = _mm_max_ps(_mm_set1_ps(0), _mm_min_ps(k, t));
 	t = _mm_mul_ps(t, _mm_mul_ps(S, V));
 
 	v4 rgba;
