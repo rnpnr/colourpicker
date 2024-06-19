@@ -56,8 +56,17 @@ enum colour_picker_flags {
 };
 
 typedef struct {
+	v4  last;
+	v4  items[5];
+	f32 scales[5];
+	i32 widx;
+	f32 fade_param;
+	f32 yoff;
+} ColourStackState;
+
+typedef struct {
 	v4 colour;
-	struct { v4 items[5]; i32 widx; } colour_stack;
+	ColourStackState colour_stack;
 
 	Font font;
 	i32  font_size;

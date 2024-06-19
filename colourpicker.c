@@ -355,14 +355,14 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 }
 
 static void
-do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx,
-                     f32 fade_param, f32 stack_offset_y, f32 dt)
+do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx, b32 fade, f32 dt)
 {
-	static f32 stack_scales[ARRAY_COUNT(ctx->colour_stack.items)] = { 1, 1, 1, 1, 1 };
+	ColourStackState *css = &ctx->colour_stack;
+	f32 fade_param = fade? css->fade_param : 0;
 	f32 stack_scale_target = 1.2f;
 	f32 stack_scale_delta  = (stack_scale_target - 1) * 8 * dt;
 
-	v4 colour = ctx->colour_stack.items[item_idx];
+	v4 colour = css->items[item_idx];
 
 	b32 stack_collides = CheckCollisionPointRec(mouse.rv, r.rr);
 	if (stack_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -374,14 +374,14 @@ do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx,
 		}
 	}
 
-	stack_scales[item_idx] = move_towards_f32(stack_scales[item_idx],
-	                                          stack_collides? stack_scale_target : 1,
-	                                          stack_scale_delta);
-	f32 scale = stack_scales[item_idx];
+	css->scales[item_idx] = move_towards_f32(css->scales[item_idx],
+	                                         stack_collides? stack_scale_target : 1,
+	                                         stack_scale_delta);
+	f32 scale = css->scales[item_idx];
 	Rect draw_rect = {
 		.pos = {
 			.x = r.pos.x - (scale - 1) * r.size.w / 2,
-			.y = r.pos.y - (scale - 1) * r.size.h / 2 + stack_offset_y,
+			.y = r.pos.y - (scale - 1) * r.size.h / 2 + css->yoff,
 		},
 		.size = { .x = r.size.w * scale, .y = r.size.h * scale },
 	};
@@ -401,38 +401,34 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 	r.pos.x  += sa.size.w * 0.15;
 	r.pos.y  += sa.size.h * 0.06;
 
-	static v4  last_colour    = {0};
-	static f32 fade_param     = 1.0f;
-	static f32 stack_offset_y = 0;
 	f32 stack_off_target      = -sa.size.h * 0.16;
 	f32 stack_off_delta       = -stack_off_target * 5 * dt;
 
-	b32 fade_stack = fade_param != 1.0f;
+	ColourStackState *css = &ctx->colour_stack;
+	b32 fade_stack = css->fade_param != 1.0f;
 	if (fade_stack) {
 		Rect draw_rect   = r;
-		draw_rect.pos.y += stack_offset_y;
+		draw_rect.pos.y += css->yoff;
 		r.pos.y += sa.size.h * 0.16;
-		Color old = Fade(ColorFromNormalized(last_colour.rv), fade_param);
+		Color old = Fade(ColorFromNormalized(css->last.rv), css->fade_param);
 		DrawRectangleRounded(draw_rect.rr, 1, 0, old);
-		DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, fade_param));
+		DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, css->fade_param));
 	}
 
 	for (u32 i = 0; i < 4; i++) {
 		i32 cidx = (ctx->colour_stack.widx + i) % ARRAY_COUNT(ctx->colour_stack.items);
-		do_colour_stack_item(ctx, mouse, r, cidx, 0, stack_offset_y, dt);
+		do_colour_stack_item(ctx, mouse, r, cidx, 0, dt);
 		r.pos.y += sa.size.h * 0.16;
 	}
 
 	i32 last_idx = (ctx->colour_stack.widx + 4) % ARRAY_COUNT(ctx->colour_stack.items);
-	do_colour_stack_item(ctx, mouse, r, last_idx, fade_stack? fade_param : 0,
-	                     stack_offset_y, dt);
+	do_colour_stack_item(ctx, mouse, r, last_idx, fade_stack, dt);
 
-	fade_param     = move_towards_f32(fade_param, fade_stack? 0 : 1, 8 * dt);
-	stack_offset_y = move_towards_f32(stack_offset_y, fade_stack? stack_off_target : 0,
-	                                  stack_off_delta);
-	if (stack_offset_y == stack_off_target) {
-		fade_param = 1.0f;
-		stack_offset_y = 0;
+	css->fade_param = move_towards_f32(css->fade_param, fade_stack? 0 : 1, 8 * dt);
+	css->yoff       = move_towards_f32(css->yoff, fade_stack? stack_off_target : 0, stack_off_delta);
+	if (css->yoff == stack_off_target) {
+		css->fade_param = 1.0f;
+		css->yoff       = 0;
 	}
 
 	r.pos.y = sa.pos.y + sa.size.h - r.size.h;
@@ -465,16 +461,16 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 
 	DrawTriangle(t_top.rv, t_left.rv, t_right.rv, ctx->fg);
 	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		fade_param -= 1e-6;
+		css->fade_param -= 1e-6;
 		v4 colour  = ctx->colour;
 		if (ctx->mode == CPM_HSV)
 			colour = hsv_to_rgb(colour);
 
-		last_colour = ctx->colour_stack.items[ctx->colour_stack.widx];
-		ctx->colour_stack.items[ctx->colour_stack.widx++] = colour;
+		css->last = css->items[css->widx];
+		css->items[css->widx++] = colour;
 
-		if (ctx->colour_stack.widx == ARRAY_COUNT(ctx->colour_stack.items))
-			ctx->colour_stack.widx = 0;
+		if (css->widx == ARRAY_COUNT(css->items))
+			css->widx = 0;
 	}
 }
 
