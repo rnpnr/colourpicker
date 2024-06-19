@@ -128,51 +128,31 @@ hsv_to_rgb(v4 hsv)
 static void
 fill_hsv_image(Image img, v4 hsv)
 {
-	f32 param = 0, line_length = (f32)img.height / 3, tmp;
-	v2 top = {0}, bottom = {0};
-	bottom.y = line_length;
+	f32 line_length = (f32)img.height / 3;
+	v2 htop = {0};
+	v2 hbot = { .y = htop.y + line_length };
+	v2 sbot = { .y = hbot.y + line_length };
+	v2 vbot = { .y = sbot.y + line_length };
 
-	/* H component */
+	v4 h = hsv, s = hsv, v = hsv;
+	h.x = 0;
+	s.y = 0;
+	v.z = 0;
+
 	for (u32 i = 0; i < img.width; i++) {
-		Color rgb = ColorFromHSV(param, hsv.y, hsv.z);
-		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
-		top.x    += 1.0;
-		bottom.x += 1.0;
-		param    += 360.0 / img.width;
-	}
-
-	param     = 0.0;
-	top.x     = 0.0;
-	bottom.x  = 0.0;
-	top.y    += line_length;
-	bottom.y += line_length;
-
-	/* S component */
-	tmp   = hsv.y;
-	hsv.y = 0;
-	for (u32 i = 0; i < img.width; i++) {
-		Color rgb = ColorFromNormalized(hsv_to_rgb(hsv).rv);
-		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
-		top.x    += 1.0;
-		bottom.x += 1.0;
-		hsv.y    += 1.0 / img.width;
-	}
-
-	hsv.y     = tmp;
-	top.x     = 0.0;
-	bottom.x  = 0.0;
-	top.y    += line_length;
-	bottom.y += line_length;
-
-	/* V component */
-	tmp   = hsv.z;
-	hsv.z = 0;
-	for (u32 i = 0; i < img.width; i++) {
-		Color rgb = ColorFromNormalized(hsv_to_rgb(hsv).rv);
-		ImageDrawLineV(&img, top.rv, bottom.rv, rgb);
-		top.x    += 1.0;
-		bottom.x += 1.0;
-		hsv.z    += 1.0 / img.width;
+		Color hrgb = ColorFromNormalized(hsv_to_rgb(h).rv);
+		Color srgb = ColorFromNormalized(hsv_to_rgb(s).rv);
+		Color vrgb = ColorFromNormalized(hsv_to_rgb(v).rv);
+		ImageDrawLineV(&img, htop.rv, hbot.rv, hrgb);
+		ImageDrawLineV(&img, hbot.rv, sbot.rv, srgb);
+		ImageDrawLineV(&img, sbot.rv, vbot.rv, vrgb);
+		htop.x += 1.0;
+		hbot.x += 1.0;
+		sbot.x += 1.0;
+		vbot.x += 1.0;
+		h.x    += 1.0 / img.width;
+		s.y    += 1.0 / img.width;
+		v.z    += 1.0 / img.width;
 	}
 }
 
