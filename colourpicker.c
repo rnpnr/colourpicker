@@ -86,8 +86,48 @@ cut_rect_right(Rect r, f32 fraction)
 static v4
 rgb_to_hsv(v4 rgb)
 {
-	Vector3 hsv = ColorToHSV(ColorFromNormalized(rgb.rv));
-	return (v4){ .x = hsv.x / 360, .y = hsv.y, .z = hsv.z, .w = rgb.a };
+	__m128 rgba = _mm_loadu_ps(rgb.E);
+	__m128 gbra = _mm_shuffle_ps(rgba, rgba, _MM_SHUFFLE(3, 0, 2, 1));
+	__m128 brga = _mm_shuffle_ps(gbra, gbra, _MM_SHUFFLE(3, 0, 2, 1));
+
+	__m128 Max  = _mm_max_ps(rgba, _mm_max_ps(gbra, brga));
+	__m128 Min  = _mm_min_ps(rgba, _mm_min_ps(gbra, brga));
+	__m128 C    = _mm_sub_ps(Max, Min);
+
+	__m128 t = _mm_div_ps(_mm_sub_ps(gbra, brga), C);
+
+	_Alignas(16) f32 aval[4] = { 0, 2, 4, 0 };
+	t = _mm_add_ps(t, _mm_load_ps(aval));
+
+	/* TODO: does (G - B) / C ever exceed 6.0? */
+	/* NOTE: 1e9 ensures that the remainder after floor is 0.
+	 * This limits the fmodf to apply only to element [0] */
+	_Alignas(16) f32 div[4] = { 6, 1e9, 1e9, 1e9 };
+	__m128 six = _mm_set1_ps(6);
+	__m128 rem = _mm_floor_ps(_mm_div_ps(t, _mm_load_ps(div)));
+	t = _mm_sub_ps(t, _mm_mul_ps(rem, six));
+
+	__m128 zero    = _mm_set1_ps(0);
+	__m128 maxmask = _mm_cmpeq_ps(rgba, Max);
+
+	__m128 H = _mm_div_ps(_mm_blendv_ps(zero, t, maxmask), six);
+	__m128 S = _mm_div_ps(C, Max);
+
+	/* NOTE: Make sure H & S are 0 instead of NaN when V == 0 */
+	__m128 zeromask = _mm_cmpeq_ps(zero, Max);
+	H = _mm_blendv_ps(H, zero, zeromask);
+	S = _mm_blendv_ps(S, zero, zeromask);
+
+	__m128 H0 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 0, 0, 0));
+	__m128 H1 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 1, 1, 1));
+	__m128 H2 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 2, 2, 2));
+	H         = _mm_or_ps(H0, _mm_or_ps(H1, H2));
+
+	/* NOTE: keep only element [0] from H vector; Max contains V & A */
+	__m128 hva = _mm_blend_ps(Max, H, 0x01);
+	v4 res;
+	_mm_storeu_ps(res.E, _mm_blend_ps(hva, S, 0x02));
+	return res;
 }
 
 static v4
@@ -98,11 +138,11 @@ hsv_to_rgb(v4 hsv)
 	 * (R, G, B) = (f(n = 5), f(n = 3), f(n = 1))
 	 */
 	_Alignas(16) f32 nval[4] = {5.0f, 3.0f, 1.0f, 0.0f};
-	__m128 n    = _mm_load_ps(nval);
-	__m128 H    = _mm_set1_ps(hsv.x);
-	__m128 S    = _mm_set1_ps(hsv.y);
-	__m128 V    = _mm_set1_ps(hsv.z);
-	__m128 six  = _mm_set1_ps(6);
+	__m128 n   = _mm_load_ps(nval);
+	__m128 H   = _mm_set1_ps(hsv.x);
+	__m128 S   = _mm_set1_ps(hsv.y);
+	__m128 V   = _mm_set1_ps(hsv.z);
+	__m128 six = _mm_set1_ps(6);
 
 	__m128 t   = _mm_add_ps(n, _mm_mul_ps(six, H));
 	__m128 rem = _mm_floor_ps(_mm_div_ps(t, six));
@@ -133,6 +173,7 @@ fill_hsv_image(Image img, v4 hsv)
 	s.y = 0;
 	v.z = 0;
 
+	f32 inc = 1.0 / img.width;
 	for (u32 i = 0; i < img.width; i++) {
 		Color hrgb = ColorFromNormalized(hsv_to_rgb(h).rv);
 		Color srgb = ColorFromNormalized(hsv_to_rgb(s).rv);
@@ -144,9 +185,9 @@ fill_hsv_image(Image img, v4 hsv)
 		hbot.x += 1.0;
 		sbot.x += 1.0;
 		vbot.x += 1.0;
-		h.x    += 1.0 / img.width;
-		s.y    += 1.0 / img.width;
-		v.z    += 1.0 / img.width;
+		h.x    += inc;
+		s.y    += inc;
+		v.z    += inc;
 	}
 }
 
@@ -401,8 +442,8 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 	r.pos.x  += sa.size.w * 0.15;
 	r.pos.y  += sa.size.h * 0.06;
 
-	f32 stack_off_target      = -sa.size.h * 0.16;
-	f32 stack_off_delta       = -stack_off_target * 5 * dt;
+	f32 stack_off_target = -sa.size.h * 0.16;
+	f32 stack_off_delta  = -stack_off_target * 5 * dt;
 
 	ColourStackState *css = &ctx->colour_stack;
 	b32 fade_stack = css->fade_param != 1.0f;
