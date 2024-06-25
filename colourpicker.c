@@ -15,18 +15,16 @@ static const char *mode_labels[CPM_LAST][4] = {
 static f32
 move_towards_f32(f32 current, f32 target, f32 delta)
 {
-	f32 result;
-	f32 remaining = target - current;
-
-	if (ABS(remaining) < ABS(delta))
-		return target;
-
-	if (target < current)
-		result = current - delta;
-	else
-		result = current + delta;
-
-	return result;
+	if (target < current) {
+		current -= delta;
+		if (current < target)
+			current = target;
+	} else {
+		current += delta;
+		if (current > target)
+			current = target;
+	}
+	return current;
 }
 
 static v2
