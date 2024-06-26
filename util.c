@@ -73,8 +73,7 @@ typedef struct {
 	uv2 window_size;
 	Color bg, fg;
 
-	Texture2D hsv_texture;
-	Image     hsv_img;
+	RenderTexture hsv_texture;
 
 	u32  flags;
 	enum colour_picker_mode mode;

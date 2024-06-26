@@ -158,35 +158,37 @@ hsv_to_rgb(v4 hsv)
 }
 
 static void
-fill_hsv_image(Image img, v4 hsv)
+fill_hsv_texture(RenderTexture texture, v4 hsv)
 {
-	f32 line_length = (f32)img.height / 3;
-	v2 htop = {0};
-	v2 hbot = { .y = htop.y + line_length };
-	v2 sbot = { .y = hbot.y + line_length };
-	v2 vbot = { .y = sbot.y + line_length };
+	f32 line_length = (f32)texture.texture.height / 3;
+	v2 vtop = {0};
+	v2 vbot = { .y = vtop.y + line_length };
+	v2 sbot = { .y = vbot.y + line_length };
+	v2 hbot = { .y = sbot.y + line_length };
 
 	v4 h = hsv, s = hsv, v = hsv;
 	h.x = 0;
 	s.y = 0;
 	v.z = 0;
 
-	f32 inc = 1.0 / img.width;
-	for (u32 i = 0; i < img.width; i++) {
-		Color hrgb = ColorFromNormalized(hsv_to_rgb(h).rv);
-		Color srgb = ColorFromNormalized(hsv_to_rgb(s).rv);
-		Color vrgb = ColorFromNormalized(hsv_to_rgb(v).rv);
-		ImageDrawLineV(&img, htop.rv, hbot.rv, hrgb);
-		ImageDrawLineV(&img, hbot.rv, sbot.rv, srgb);
-		ImageDrawLineV(&img, sbot.rv, vbot.rv, vrgb);
-		htop.x += 1.0;
-		hbot.x += 1.0;
-		sbot.x += 1.0;
-		vbot.x += 1.0;
-		h.x    += inc;
-		s.y    += inc;
-		v.z    += inc;
-	}
+	f32 inc = 1.0 / texture.texture.width;
+	BeginTextureMode(texture);
+		for (u32 i = 0; i < texture.texture.width; i++) {
+			Color hrgb = ColorFromNormalized(hsv_to_rgb(h).rv);
+			Color srgb = ColorFromNormalized(hsv_to_rgb(s).rv);
+			Color vrgb = ColorFromNormalized(hsv_to_rgb(v).rv);
+			DrawLineV(sbot.rv, hbot.rv, hrgb);
+			DrawLineV(vbot.rv, sbot.rv, srgb);
+			DrawLineV(vtop.rv, vbot.rv, vrgb);
+			hbot.x += 1.0;
+			sbot.x += 1.0;
+			vtop.x += 1.0;
+			vbot.x += 1.0;
+			h.x    += inc;
+			s.y    += inc;
+			v.z    += inc;
+		}
+	EndTextureMode();
 }
 
 static void
@@ -260,10 +262,10 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 			DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
 		} else {
 			Rect tr    = {0};
-			tr.pos.y  += ctx->hsv_img.height / 3 * label_idx;
+			tr.pos.y  += ctx->hsv_texture.texture.height / 3 * label_idx;
 			tr.size.h  = sr.size.h;
-			tr.size.w  = ctx->hsv_img.width;
-			DrawTexturePro(ctx->hsv_texture, tr.rr, sr.rr, (Vector2){0}, 0, WHITE);
+			tr.size.w  = ctx->hsv_texture.texture.width;
+			DrawTexturePro(ctx->hsv_texture.texture, tr.rr, sr.rr, (Vector2){0}, 0, WHITE);
 		}
 	}
 
@@ -561,16 +563,14 @@ do_colour_picker(ColourPickerCtx *ctx)
 		if (ctx->flags & CPF_REFILL_TEXTURE) {
 			Rect sr;
 			get_slider_subrects(r, 0, &sr, 0);
-			if (ctx->hsv_img.width != (i32)(sr.size.w + 0.5)) {
+			if (ctx->hsv_texture.texture.width != (i32)(sr.size.w + 0.5)) {
 				i32 w = sr.size.w + 0.5;
 				i32 h = sr.size.h * 3;
 				h += 3 - (h % 3);
-				ImageResize(&ctx->hsv_img, w, h);
-				UnloadTexture(ctx->hsv_texture);
-				ctx->hsv_texture = LoadTextureFromImage(ctx->hsv_img);
+				UnloadRenderTexture(ctx->hsv_texture);
+				ctx->hsv_texture = LoadRenderTexture(w, h);
 			}
-			fill_hsv_image(ctx->hsv_img, ctx->colour);
-			UpdateTexture(ctx->hsv_texture, ctx->hsv_img.data);
+			fill_hsv_texture(ctx->hsv_texture, ctx->colour);
 			ctx->flags &= ~CPF_REFILL_TEXTURE;
 		}
 

@@ -105,8 +105,7 @@ main(void)
 	ctx.font      = LoadFontEx(fontpath, 128, 0, 0);
 	ctx.font_size = 44;
 
-	ctx.hsv_img     = GenImageColor(360, 360, BLACK);
-	ctx.hsv_texture = LoadTextureFromImage(ctx.hsv_img);
+	ctx.hsv_texture = LoadRenderTexture(360, 360);
 
 	while(!WindowShouldClose()) {
 		do_debug();
