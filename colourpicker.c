@@ -1,7 +1,6 @@
 /* See LICENSE for copyright details */
 #include <emmintrin.h>
 #include <immintrin.h>
-#include <xmmintrin.h>
 
 #include <raylib.h>
 #include <stdio.h>
@@ -89,7 +88,7 @@ colour_from_normalized(v4 colour)
 	__m128 scale    = _mm_set1_ps(255.0f);
 	__m128i result  = _mm_cvtps_epi32(_mm_mul_ps(colour_v, scale));
 	_Alignas(16) u32 outu[4];
-	_mm_store_epi32(outu, result);
+	_mm_store_si128((__m128i *)outu, result);
 	return (Color){.r = outu[0] & 0xFF, .g = outu[1] & 0xFF, .b = outu[2] & 0xFF, .a = outu[3] & 0xFF };
 }
 
