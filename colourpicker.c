@@ -1,6 +1,7 @@
 /* See LICENSE for copyright details */
 #include <emmintrin.h>
 #include <immintrin.h>
+#include <xmmintrin.h>
 
 #include <raylib.h>
 #include <stdio.h>
@@ -79,6 +80,17 @@ cut_rect_right(Rect r, f32 fraction)
 	r.pos.x  += fraction * r.size.w;
 	r.size.w *= (1 - fraction);
 	return r;
+}
+
+static Color
+colour_from_normalized(v4 colour)
+{
+	__m128 colour_v = _mm_loadu_ps(colour.E);
+	__m128 scale    = _mm_set1_ps(255.0f);
+	__m128i result  = _mm_cvtps_epi32(_mm_mul_ps(colour_v, scale));
+	_Alignas(16) u32 outu[4];
+	_mm_store_epi32(outu, result);
+	return (Color){.r = outu[0] & 0xFF, .g = outu[1] & 0xFF, .b = outu[2] & 0xFF, .a = outu[3] & 0xFF };
 }
 
 static v4
@@ -174,12 +186,9 @@ fill_hsv_texture(RenderTexture texture, v4 hsv)
 	f32 inc = 1.0 / texture.texture.width;
 	BeginTextureMode(texture);
 		for (u32 i = 0; i < texture.texture.width; i++) {
-			Color hrgb = ColorFromNormalized(hsv_to_rgb(h).rv);
-			Color srgb = ColorFromNormalized(hsv_to_rgb(s).rv);
-			Color vrgb = ColorFromNormalized(hsv_to_rgb(v).rv);
-			DrawLineV(sbot.rv, hbot.rv, hrgb);
-			DrawLineV(vbot.rv, sbot.rv, srgb);
-			DrawLineV(vtop.rv, vbot.rv, vrgb);
+			DrawLineV(sbot.rv, hbot.rv, colour_from_normalized(hsv_to_rgb(h)));
+			DrawLineV(vbot.rv, sbot.rv, colour_from_normalized(hsv_to_rgb(s)));
+			DrawLineV(vtop.rv, vbot.rv, colour_from_normalized(hsv_to_rgb(v)));
 			hbot.x += 1.0;
 			sbot.x += 1.0;
 			vtop.x += 1.0;
@@ -246,14 +255,14 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 		v4 cr     = ctx->colour;
 		cl.E[label_idx] = 0;
 		cr.E[label_idx] = 1;
-		left      = ColorFromNormalized(cl.rv);
-		right     = ColorFromNormalized(cr.rv);
-		sel       = ColorFromNormalized(ctx->colour.rv);
+		left      = colour_from_normalized(cl);
+		right     = colour_from_normalized(cr);
+		sel       = colour_from_normalized(ctx->colour);
 		DrawRectangleGradientEx(srl.rr, left, left, sel, sel);
 		DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
 	} else {
 		if (label_idx == 3) { /* Alpha */
-			Color sel   = ColorFromNormalized(hsv_to_rgb(ctx->colour).rv);
+			Color sel   = colour_from_normalized(hsv_to_rgb(ctx->colour));
 			Color left  = sel;
 			Color right = sel;
 			left.a  = 0;
@@ -280,9 +289,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 		b32 should_scale = (held_idx == -1 && hovering) ||
 		                   (held_idx != -1 && label_idx == held_idx);
 		f32 scale = slider_scale[label_idx];
-		scale     = move_towards_f32(scale,
-		                             should_scale? scale_target : 1.0,
-		                             scale_delta);
+		scale     = move_towards_f32(scale, should_scale? scale_target : 1.0, scale_delta);
 		slider_scale[label_idx] = scale;
 
 		f32 half_tri_w = 8;
@@ -363,9 +370,9 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 
 	Color hc;
 	if (ctx->mode == CPM_HSV)
-		hc = ColorFromNormalized(hsv_to_rgb(ctx->colour).rv);
+		hc = colour_from_normalized(hsv_to_rgb(ctx->colour));
 	else
-		hc = ColorFromNormalized(ctx->colour.rv);
+		hc = colour_from_normalized(ctx->colour);
 	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
@@ -426,7 +433,7 @@ do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx, b32 f
 		},
 		.size = { .x = r.size.w * scale, .y = r.size.h * scale },
 	};
-	Color disp = ColorFromNormalized(colour.rv);
+	Color disp = colour_from_normalized(colour);
 	DrawRectangleRounded(draw_rect.rr, 1, 0, Fade(disp, 1 - fade_param));
 	DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, 1 - fade_param));
 }
@@ -451,7 +458,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 		Rect draw_rect   = r;
 		draw_rect.pos.y += css->yoff;
 		r.pos.y += sa.size.h * 0.16;
-		Color old = Fade(ColorFromNormalized(css->last.rv), css->fade_param);
+		Color old = Fade(colour_from_normalized(css->last), css->fade_param);
 		DrawRectangleRounded(draw_rect.rr, 1, 0, old);
 		DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, css->fade_param));
 	}
@@ -542,7 +549,7 @@ do_colour_picker(ColourPickerCtx *ctx)
 		Rect sa = cut_rect_right(upper, 0.8);
 
 		v4 vcolour = ctx->mode == CPM_HSV ? hsv_to_rgb(ctx->colour) : ctx->colour;
-		Color colour = ColorFromNormalized(vcolour.rv);
+		Color colour = colour_from_normalized(vcolour);
 		v2 cc = { .x = ca.pos.x + 0.47 * ca.size.w, .y = ca.pos.y + 0.5 * ca.size.h };
 		DrawRing(cc.rv, 0.4 * ca.size.w, 0.42 * ca.size.w, 0, 360, 69, Fade(BLACK, 0.5));
 		DrawCircleSector(cc.rv, 0.4 * ca.size.w, 0, 360, 69, colour);
