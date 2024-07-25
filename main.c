@@ -72,13 +72,17 @@ static void do_debug(void) { }
 static void __attribute__((noreturn))
 usage(char *argv0)
 {
+	printf("usage: %s [-h ????????] [-r ?.??] [-g ?.??] [-b ?.??] [-a ?.??]\n"
+	       "\t-h:          Hexadecimal Colour\n"
+	       "\t-r|-g|-b|-a: Floating Point Colour Value\n", argv0);
 	exit(1);
 }
 
 static f32
 parse_f32(char *s)
 {
-	return atof(s);
+	f32 res = atof(s);
+	return CLAMP(res, 0, 1);
 }
 
 static u32
@@ -99,8 +103,7 @@ parse_u32(char *s)
 			*s  |= 0x20;
 			res |= *s - 0x57;
 		} else {
-			/* TODO: invalid input */
-			ASSERT(0);
+			/* NOTE: do nothing (treat invalid value as 0) */
 		}
 	}
 	return res;
