@@ -96,7 +96,7 @@ main(void)
 	};
 
 	#ifndef _DEBUG
-	SetTraceLogLevel(LOG_ERROR);
+	SetTraceLogLevel(LOG_NONE);
 	#endif
 
 	SetConfigFlags(FLAG_VSYNC_HINT);
@@ -114,4 +114,19 @@ main(void)
 		do_colour_picker(&ctx);
 		EndDrawing();
 	}
+
+	v4 rgba = {0};
+	switch (ctx.mode) {
+	case CPM_RGB: rgba = ctx.colour;             break;
+	case CPM_HSV: rgba = hsv_to_rgb(ctx.colour); break;
+	default:      ASSERT(0);                     break;
+	}
+
+	Color rl        = colour_from_normalized(rgba);
+	u32 packed_rgba = rl.r << 24 | rl.g << 16 | rl.b << 8 | rl.a << 0;
+
+	printf("0x%08X|{.r = %0.02f, .g = %0.02f, .b = %0.02f, .a = %0.02f}\n",
+	       packed_rgba, rgba.r, rgba.g, rgba.b, rgba.a);
+
+	return 0;
 }
