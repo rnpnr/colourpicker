@@ -43,6 +43,16 @@ right_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
 	};
 }
 
+static Rect
+scale_rect_centered(Rect r, f32 scale)
+{
+	r.pos.x  += ABS(1 - scale) / 2 * r.size.w;
+	r.pos.y  += ABS(1 - scale) / 2 * r.size.h;
+	r.size.h *= scale;
+	r.size.w *= scale;
+	return r;
+}
+
 static v2
 center_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
 {
@@ -344,8 +354,8 @@ do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx, b32 f
 	};
 	Color disp = colour_from_normalized(colour);
 	DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, Fade(disp, 1 - fade_param));
-	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0,
-	                            Fade(BLACK, 1 - fade_param));
+	draw_rect = scale_rect_centered(draw_rect, 0.96);
+	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0, Fade(BLACK, 1 - fade_param));
 }
 
 static void
