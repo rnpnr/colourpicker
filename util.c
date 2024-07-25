@@ -55,10 +55,12 @@ enum colour_picker_flags {
 	CPF_REFILL_TEXTURE = 1 << 0,
 };
 
+#define STACK_ROUNDNESS    0.5f
+#define COLOUR_STACK_ITEMS 8
 typedef struct {
 	v4  last;
-	v4  items[5];
-	f32 scales[5];
+	v4  items[COLOUR_STACK_ITEMS];
+	f32 scales[COLOUR_STACK_ITEMS];
 	i32 widx;
 	f32 fade_param;
 	f32 yoff;

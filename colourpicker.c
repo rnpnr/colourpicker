@@ -406,7 +406,7 @@ do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx, b32 f
 {
 	ColourStackState *css = &ctx->colour_stack;
 	f32 fade_param = fade? css->fade_param : 0;
-	f32 stack_scale_target = 1.2f;
+	f32 stack_scale_target = (f32)(ARRAY_COUNT(css->items) + 1) / ARRAY_COUNT(css->items);
 	f32 stack_scale_delta  = (stack_scale_target - 1) * 8 * dt;
 
 	v4 colour = css->items[item_idx];
@@ -433,42 +433,47 @@ do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx, b32 f
 		.size = { .x = r.size.w * scale, .y = r.size.h * scale },
 	};
 	Color disp = colour_from_normalized(colour);
-	DrawRectangleRounded(draw_rect.rr, 1, 0, Fade(disp, 1 - fade_param));
-	DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, 1 - fade_param));
+	DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, Fade(disp, 1 - fade_param));
+	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0,
+	                            Fade(BLACK, 1 - fade_param));
 }
 
 static void
 do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 {
+	ColourStackState *css = &ctx->colour_stack;
+
 	v2 mouse = { .rv = GetMousePosition() };
 
 	Rect r    = sa;
-	r.size.h *= 0.12;
-	r.size.w *= 0.7;
-	r.pos.x  += sa.size.w * 0.15;
-	r.pos.y  += sa.size.h * 0.06;
+	r.size.h *= 1.0 / (ARRAY_COUNT(css->items) + 3);
+	r.size.w *= 0.5;
+	r.pos.x  += (sa.size.w - r.size.w) * 0.5;
 
-	f32 stack_off_target = -sa.size.h * 0.16;
+	f32 y_pos_delta = r.size.h + 10;
+
+	f32 stack_off_target = -y_pos_delta;
 	f32 stack_off_delta  = -stack_off_target * 5 * dt;
 
-	ColourStackState *css = &ctx->colour_stack;
 	b32 fade_stack = css->fade_param != 1.0f;
 	if (fade_stack) {
 		Rect draw_rect   = r;
 		draw_rect.pos.y += css->yoff;
-		r.pos.y += sa.size.h * 0.16;
+		r.pos.y += y_pos_delta;
 		Color old = Fade(colour_from_normalized(css->last), css->fade_param);
-		DrawRectangleRounded(draw_rect.rr, 1, 0, old);
-		DrawRectangleRoundedLinesEx(draw_rect.rr, 1, 0, 3.0, Fade(BLACK, css->fade_param));
+		DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, old);
+		DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0,
+		                            Fade(BLACK, css->fade_param));
 	}
 
-	for (u32 i = 0; i < 4; i++) {
-		i32 cidx = (ctx->colour_stack.widx + i) % ARRAY_COUNT(ctx->colour_stack.items);
+	u32 loop_items = ARRAY_COUNT(css->items) - 1;
+	for (u32 i = 0; i < loop_items; i++) {
+		i32 cidx = (css->widx + i) % ARRAY_COUNT(css->items);
 		do_colour_stack_item(ctx, mouse, r, cidx, 0, dt);
-		r.pos.y += sa.size.h * 0.16;
+		r.pos.y += y_pos_delta;
 	}
 
-	i32 last_idx = (ctx->colour_stack.widx + 4) % ARRAY_COUNT(ctx->colour_stack.items);
+	i32 last_idx = (css->widx + loop_items) % ARRAY_COUNT(css->items);
 	do_colour_stack_item(ctx, mouse, r, last_idx, fade_stack, dt);
 
 	css->fade_param = move_towards_f32(css->fade_param, fade_stack? 0 : 1, 8 * dt);
@@ -478,7 +483,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 		css->yoff       = 0;
 	}
 
-	r.pos.y = sa.pos.y + sa.size.h - r.size.h;
+	r.pos.y   = sa.pos.y + sa.size.h - r.size.h;
 	r.pos.x  += r.size.w * 0.1;
 	r.size.w *= 0.8;
 
