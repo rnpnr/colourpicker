@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <raylib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -68,8 +69,45 @@ static void do_debug(void) { }
 
 #endif /* _DEBUG */
 
+static void __attribute__((noreturn))
+usage(char *argv0)
+{
+	exit(1);
+}
+
+static f32
+parse_f32(char *s)
+{
+	return atof(s);
+}
+
+static u32
+parse_u32(char *s)
+{
+	u32 res = 0;
+
+	/* NOTE: skip over '0x' or '0X' */
+	if (*s == '0' && (*(s + 1) == 'x' || *(s + 1) == 'X'))
+		s += 2;
+
+	for (; *s; s++) {
+		res <<= 4;
+		if (ISDIGIT(*s)) {
+			res |= *s - '0';
+		} else if (ISHEX(*s)) {
+			/* NOTE: convert to lowercase first then convert to value */
+			*s  |= 0x20;
+			res |= *s - 0x57;
+		} else {
+			/* TODO: invalid input */
+			ASSERT(0);
+		}
+	}
+	return res;
+}
+
 int
-main(void)
+main(i32 argc, char *argv[])
 {
 	ColourPickerCtx ctx = {
 		.window_size = { .w = 720, .h = 960 },
@@ -91,9 +129,37 @@ main(void)
 				{ .r = 0.59, .g = 0.11, .b = 0.25, .a = 1.00 },
 				{ .r = 0.11, .g = 0.59, .b = 0.36, .a = 1.00 },
 				{ .r = 0.14, .g = 0.29, .b = 0.72, .a = 1.00 },
+				/* TODO: add 3 more defaults */
 			},
 		},
 	};
+
+	{
+		v4 rgb = hsv_to_rgb(ctx.colour);
+		for (i32 i = 1; i < argc; i++) {
+			if (argv[i][0] == '-') {
+				if (!argv[i + 1] || !ISDIGIT(argv[i + 1][0]) ||
+				    (argv[i][1] == 'h' && !ISHEX(argv[i + 1][0])))
+					usage(argv[0]);
+
+				switch (argv[i][1]) {
+				case 'h':
+					rgb = normalize_colour(parse_u32(argv[i + 1]));
+					ctx.colour = rgb_to_hsv(rgb);
+					break;
+				case 'r': rgb.r = parse_f32(argv[i + 1]); break;
+				case 'g': rgb.g = parse_f32(argv[i + 1]); break;
+				case 'b': rgb.b = parse_f32(argv[i + 1]); break;
+				case 'a': rgb.a = parse_f32(argv[i + 1]); break;
+				default:  usage(argv[0]);                 break;
+				}
+				i++;
+			} else {
+				usage(argv[0]);
+			}
+		}
+		ctx.colour = rgb_to_hsv(rgb);
+	}
 
 	#ifndef _DEBUG
 	SetTraceLogLevel(LOG_NONE);

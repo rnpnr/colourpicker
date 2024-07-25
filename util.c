@@ -87,6 +87,9 @@ typedef struct {
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 
+#define ISDIGIT(a)     ((a) >= '0' && (a) <= '9')
+#define ISHEX(a)       (ISDIGIT(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
+
 static Color
 colour_from_normalized(v4 colour)
 {
@@ -96,6 +99,17 @@ colour_from_normalized(v4 colour)
 	_Alignas(16) u32 outu[4];
 	_mm_store_si128((__m128i *)outu, result);
 	return (Color){.r = outu[0] & 0xFF, .g = outu[1] & 0xFF, .b = outu[2] & 0xFF, .a = outu[3] & 0xFF };
+}
+
+static v4
+normalize_colour(u32 rgba)
+{
+	return (v4){
+		.r = ((rgba >> 24) & 0xFF) / 255.0f,
+		.g = ((rgba >> 16) & 0xFF) / 255.0f,
+		.b = ((rgba >>  8) & 0xFF) / 255.0f,
+		.a = ((rgba >>  0) & 0xFF) / 255.0f,
+	};
 }
 
 static v4
