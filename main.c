@@ -107,6 +107,17 @@ parse_u32(char *s)
 	return res;
 }
 
+static v4
+normalize_colour(u32 rgba)
+{
+	return (v4){
+		.r = ((rgba >> 24) & 0xFF) / 255.0f,
+		.g = ((rgba >> 16) & 0xFF) / 255.0f,
+		.b = ((rgba >>  8) & 0xFF) / 255.0f,
+		.a = ((rgba >>  0) & 0xFF) / 255.0f,
+	};
+}
+
 int
 main(i32 argc, char *argv[])
 {

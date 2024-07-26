@@ -102,17 +102,6 @@ colour_from_normalized(v4 colour)
 }
 
 static v4
-normalize_colour(u32 rgba)
-{
-	return (v4){
-		.r = ((rgba >> 24) & 0xFF) / 255.0f,
-		.g = ((rgba >> 16) & 0xFF) / 255.0f,
-		.b = ((rgba >>  8) & 0xFF) / 255.0f,
-		.a = ((rgba >>  0) & 0xFF) / 255.0f,
-	};
-}
-
-static v4
 rgb_to_hsv(v4 rgb)
 {
 	__m128 rgba = _mm_loadu_ps(rgb.E);
