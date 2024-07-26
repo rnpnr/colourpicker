@@ -234,8 +234,8 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 	}
 
 	const char *value = TextFormat("%0.02f", current);
-	fpos = right_align_text_in_rect(vr, value, ctx->font, 0.9 * ctx->font_size);
-	DrawTextEx(ctx->font, value, fpos.rv, 0.9 * ctx->font_size, 0, ctx->fg);
+	fpos = right_align_text_in_rect(vr, value, ctx->font, ctx->font_size);
+	DrawTextEx(ctx->font, value, fpos.rv, ctx->font_size, 0, ctx->fg);
 }
 
 static void
@@ -272,7 +272,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 		}
 	}
 
-	const char *label = TextFormat("RGB: ");
+	const char *label = "RGB: ";
 	v2 label_size = {.rv = MeasureTextEx(ctx->font, label, ctx->font_size, 0)};
 	Rect label_r = cut_rect_left(hex_r,  label_size.x / hex_r.size.w);
 	hex_r        = cut_rect_right(hex_r, label_size.x / hex_r.size.w);

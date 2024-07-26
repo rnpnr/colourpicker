@@ -9,8 +9,6 @@
 
 #include "util.c"
 
-static const char *fontpath = "/home/rnp/.local/share/fonts/Aozora Mincho Medium.ttf";
-
 #ifdef _DEBUG
 typedef struct timespec Filetime;
 
@@ -173,8 +171,8 @@ main(i32 argc, char *argv[])
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 
-	ctx.font      = LoadFontEx(fontpath, 128, 0, 0);
-	ctx.font_size = 44;
+	ctx.font_size = 38;
+	ctx.font      = LoadFontEx("assets/Lora-SemiBold.ttf", ctx.font_size, 0, 0);
 
 	ctx.hsv_texture = LoadRenderTexture(360, 360);
 
