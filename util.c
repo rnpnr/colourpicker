@@ -47,9 +47,15 @@ typedef union {
 	Rectangle rr;
 } Rect;
 
+enum colour_mode {
+	CM_RGB,
+	CM_HSV,
+	CM_LAST
+};
+
 enum colour_picker_mode {
-	CPM_RGB,
-	CPM_HSV,
+	CPM_PICKER,
+	CPM_SLIDERS,
 	CPM_LAST
 };
 
@@ -91,9 +97,16 @@ typedef struct {
 
 	f32 dt;
 
+	RenderTexture slider_texture;
+	RenderTexture picker_texture;
 	RenderTexture hsv_texture;
 
+	Shader picker_shader;
+	i32    mode_id, hsv_id;
+	i32    offset_id, size_id;
+
 	u32  flags;
+	enum colour_mode        colour_mode;
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 

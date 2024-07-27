@@ -113,8 +113,9 @@ main(i32 argc, char *argv[])
 	ColourPickerCtx ctx = {
 		.window_size = { .w = 720, .h = 960 },
 
-		.mode  = CPM_HSV,
-		.flags = CPF_REFILL_TEXTURE,
+		.mode        = CPM_PICKER,
+		.colour_mode = CM_HSV,
+		.flags       = CPF_REFILL_TEXTURE,
 
 		.colour = { .r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0 },
 
@@ -178,8 +179,6 @@ main(i32 argc, char *argv[])
 	ctx.font_size = 40;
 	ctx.font      = LoadFontEx("assets/Lora-SemiBold.ttf", ctx.font_size, 0, 0);
 
-	ctx.hsv_texture = LoadRenderTexture(360, 360);
-
 	while(!WindowShouldClose()) {
 		do_debug();
 
@@ -190,9 +189,9 @@ main(i32 argc, char *argv[])
 
 	v4 rgba = {0};
 	switch (ctx.mode) {
-	case CPM_RGB: rgba = ctx.colour;             break;
-	case CPM_HSV: rgba = hsv_to_rgb(ctx.colour); break;
-	default:      ASSERT(0);                     break;
+	case CM_RGB: rgba = ctx.colour;             break;
+	case CM_HSV: rgba = hsv_to_rgb(ctx.colour); break;
+	default:     ASSERT(0);                     break;
 	}
 
 	u32 packed_rgba = pack_rl_colour(colour_from_normalized(rgba));

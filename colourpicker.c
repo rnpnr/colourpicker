@@ -4,9 +4,9 @@
 
 #include "util.c"
 
-static const char *mode_labels[CPM_LAST][4] = {
-	[CPM_RGB] = { "R", "G", "B", "A" },
-	[CPM_HSV] = { "H", "S", "V", "A" },
+static const char *mode_labels[CM_LAST][4] = {
+	[CM_RGB] = { "R", "G", "B", "A" },
+	[CM_HSV] = { "H", "S", "V", "A" },
 };
 
 static f32
@@ -150,7 +150,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 	Rect lr, sr, vr;
 	get_slider_subrects(r, &lr, &sr, &vr);
 
-	const char *label = mode_labels[ctx->mode][label_idx];
+	const char *label = mode_labels[ctx->colour_mode][label_idx];
 	v2 fpos = center_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
@@ -167,8 +167,8 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 		current += wheel / 255;
 		CLAMP01(current);
 		ctx->colour.E[held_idx] = current;
-		switch (ctx->mode) {
-		case CPM_HSV: ctx->flags |= CPF_REFILL_TEXTURE; break;
+		switch (ctx->colour_mode) {
+		case CM_HSV: ctx->flags |= CPF_REFILL_TEXTURE; break;
 		default: break;
 		}
 	}
@@ -180,7 +180,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 	Rect srl = cut_rect_left(sr, current);
 	Rect srr = cut_rect_right(sr, current);
 
-	if (ctx->mode == CPM_RGB) {
+	if (ctx->colour_mode == CM_RGB) {
 		Color sel, left, right;
 		v4 cl     = ctx->colour;
 		v4 cr     = ctx->colour;
@@ -261,29 +261,29 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 	b32 mode_collides = CheckCollisionPointRec(ctx->mouse_pos.rv, mode_r.rr);
 	if (mode_collides) {
 		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-			switch (ctx->mode++) {
-			case CPM_HSV:
-				ctx->mode    = CPM_RGB;
+			switch (ctx->colour_mode++) {
+			case CM_HSV:
+				ctx->colour_mode    = CM_RGB;
 				ctx->colour  = hsv_to_rgb(ctx->colour);
 				break;
-			case CPM_RGB:
+			case CM_RGB:
 				ctx->flags  |= CPF_REFILL_TEXTURE;
 				ctx->colour  = rgb_to_hsv(ctx->colour);
 				break;
-			case CPM_LAST: ASSERT(0); break;
+			case CM_LAST: ASSERT(0); break;
 			}
 		}
 		if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-			switch (ctx->mode--) {
-			case CPM_HSV:
+			switch (ctx->colour_mode--) {
+			case CM_HSV:
 				ctx->colour  = hsv_to_rgb(ctx->colour);
 				break;
-			case CPM_RGB:
-				ctx->mode    = CPM_HSV;
+			case CM_RGB:
+				ctx->colour_mode    = CM_HSV;
 				ctx->colour  = rgb_to_hsv(ctx->colour);
 				ctx->flags  |= CPF_REFILL_TEXTURE;
 				break;
-			case CPM_LAST: ASSERT(0); break;
+			case CM_LAST: ASSERT(0); break;
 			}
 		}
 	}
@@ -299,17 +299,17 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 		u32 r, g, b, a;
 		sscanf(new, "%02x%02x%02x%02x", &r, &g, &b, &a);
 		ctx->colour.rv = ColorNormalize((Color){ .r = r, .g = g, .b = b, .a = a });
-		switch (ctx->mode) {
-		case CPM_HSV: ctx->colour = rgb_to_hsv(ctx->colour); break;
+		switch (ctx->colour_mode) {
+		case CM_HSV: ctx->colour = rgb_to_hsv(ctx->colour); break;
 		default: break;
 		}
 	}
 
 	Color hc;
-	switch (ctx->mode) {
-	case CPM_HSV:  hc = colour_from_normalized(hsv_to_rgb(ctx->colour)); break;
-	case CPM_RGB:  hc = colour_from_normalized(ctx->colour);             break;
-	case CPM_LAST: ASSERT(0); break;
+	switch (ctx->colour_mode) {
+	case CM_HSV:  hc = colour_from_normalized(hsv_to_rgb(ctx->colour)); break;
+	case CM_RGB:  hc = colour_from_normalized(ctx->colour);             break;
+	case CM_LAST: ASSERT(0); break;
 	}
 	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 
@@ -339,10 +339,10 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 	DrawTextEx(ctx->font, hex, fpos.rv, ctx->font_size, 0, colour_from_normalized(hex_colour));
 
 	char *mtext;
-	switch (ctx->mode) {
-	case CPM_RGB:  mtext = "RGB"; break;
-	case CPM_HSV:  mtext = "HSV"; break;
-	case CPM_LAST: ASSERT(0);     break;
+	switch (ctx->colour_mode) {
+	case CM_RGB:  mtext = "RGB"; break;
+	case CM_HSV:  mtext = "HSV"; break;
+	case CM_LAST: ASSERT(0);     break;
 	}
 	fpos = right_align_text_in_rect(mode_r, mtext, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, mtext, fpos.rv, ctx->font_size, 0, colour_from_normalized(mode_colour));
@@ -360,15 +360,15 @@ do_colour_stack_item(ColourPickerCtx *ctx, Rect r, i32 item_idx, b32 fade)
 
 	b32 stack_collides = CheckCollisionPointRec(ctx->mouse_pos.rv, r.rr);
 	if (stack_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		switch (ctx->mode) {
-		case CPM_HSV:
+		switch (ctx->colour_mode) {
+		case CM_HSV:
 			ctx->colour = rgb_to_hsv(colour);
 			ctx->flags |= CPF_REFILL_TEXTURE;
 			break;
-		case CPM_RGB:
+		case CM_RGB:
 			ctx->colour = colour;
 			break;
-		case CPM_LAST:
+		case CM_LAST:
 			ASSERT(0);
 			break;
 		}
@@ -466,8 +466,8 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		css->fade_param -= 1e-6;
 		v4 colour  = ctx->colour;
-		switch (ctx->mode) {
-		case CPM_HSV: colour = hsv_to_rgb(colour); break;
+		switch (ctx->colour_mode) {
+		case CM_HSV: colour = hsv_to_rgb(colour); break;
 		default: break;
 		}
 
@@ -483,10 +483,10 @@ static void
 do_colour_selector(ColourPickerCtx *ctx, Rect r)
 {
 	Color colour = {0}, pcolour = colour_from_normalized(ctx->previous_colour);
-	switch (ctx->mode) {
-	case CPM_HSV:  colour = colour_from_normalized(hsv_to_rgb(ctx->colour)); break;
-	case CPM_RGB:  colour = colour_from_normalized(ctx->colour);             break;
-	case CPM_LAST: ASSERT(0); break;
+	switch (ctx->colour_mode) {
+	case CM_HSV:  colour = colour_from_normalized(hsv_to_rgb(ctx->colour)); break;
+	case CM_RGB:  colour = colour_from_normalized(ctx->colour);             break;
+	case CM_LAST: ASSERT(0); break;
 	}
 
 	Rect cs[2] = {cut_rect_left(r, 0.5), cut_rect_right(r, 0.5)};
@@ -514,8 +514,8 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 
 		v2 fpos = center_align_text_in_rect(cs[i], labels[i], ctx->font, ctx->font_size);
 		v2 pos  = fpos;
-		pos.x  += 2;
-		pos.y  += 2.5;
+		pos.x  += 1.75;
+		pos.y  += 2;
 		DrawTextEx(ctx->font, labels[i], pos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
 		DrawTextEx(ctx->font, labels[i], fpos.rv, ctx->font_size, 0,
 		           colour_from_normalized(colour));
@@ -529,23 +529,182 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	DrawLineEx(start.rv, end.rv, 3, Fade(BLACK, 0.8));
 
 	if (pressed_idx == 0) {
-		switch (ctx->mode) {
-		case CPM_RGB:
+		switch (ctx->colour_mode) {
+		case CM_RGB:
 			ctx->colour = ctx->previous_colour;
 			break;
-		case CPM_HSV:
+		case CM_HSV:
 			ctx->colour  = rgb_to_hsv(ctx->previous_colour);
 			ctx->flags  |= CPF_REFILL_TEXTURE;
 			break;
-		case CPM_LAST: ASSERT(0); break;
+		case CM_LAST: ASSERT(0); break;
 		}
 	} else if (pressed_idx == 1) {
-		switch (ctx->mode) {
-		case CPM_RGB:  ctx->previous_colour = ctx->colour;             break;
-		case CPM_HSV:  ctx->previous_colour = hsv_to_rgb(ctx->colour); break;
-		case CPM_LAST: ASSERT(0); break;
+		switch (ctx->colour_mode) {
+		case CM_RGB:  ctx->previous_colour = ctx->colour;             break;
+		case CM_HSV:  ctx->previous_colour = hsv_to_rgb(ctx->colour); break;
+		case CM_LAST: ASSERT(0); break;
 		}
 	}
+}
+
+static void
+do_slider_mode(ColourPickerCtx *ctx, Rect r)
+{
+	Rect sb = r;
+
+	r.size.h  *= 0.15;
+	f32 y_pad  = 0.525 * r.size.h;
+
+	sb.size.h *= 0.1;
+	r.pos.y   += 1.2 * sb.size.h;
+	do_status_bar(ctx, sb);
+
+	if (ctx->flags & CPF_REFILL_TEXTURE) {
+		Rect sr;
+		get_slider_subrects(r, 0, &sr, 0);
+		if (ctx->hsv_texture.texture.width != (i32)(sr.size.w + 0.5)) {
+			i32 w = sr.size.w + 0.5;
+			i32 h = sr.size.h * 3;
+			h += 3 - (h % 3);
+			UnloadRenderTexture(ctx->hsv_texture);
+			ctx->hsv_texture = LoadRenderTexture(w, h);
+		}
+		fill_hsv_texture(ctx->hsv_texture, ctx->colour);
+		ctx->flags &= ~CPF_REFILL_TEXTURE;
+	}
+
+	for (i32 i = 0; i < 4; i++) {
+		do_slider(ctx, r, i);
+		r.pos.y += r.size.h + y_pad;
+	}
+}
+
+static void
+do_picker_mode(ColourPickerCtx *ctx, Rect r)
+{
+	if (ctx->picker_texture.texture.width != (i32)(r.size.w)) {
+		i32 w = r.size.w;
+		i32 h = r.size.h;
+		UnloadRenderTexture(ctx->picker_texture);
+		ctx->picker_texture = LoadRenderTexture(w, h);
+	}
+
+	if (!IsShaderReady(ctx->picker_shader)) {
+		/* TODO: LoadShaderFromMemory */
+		ctx->picker_shader = LoadShader(0, "./picker_shader.glsl");
+		ctx->mode_id       = GetShaderLocation(ctx->picker_shader, "u_mode");
+		ctx->hsv_id        = GetShaderLocation(ctx->picker_shader, "u_hsv");
+		ctx->size_id       = GetShaderLocation(ctx->picker_shader, "u_size");
+		ctx->offset_id     = GetShaderLocation(ctx->picker_shader, "u_offset");
+	}
+
+	v4 colour = {0};
+	switch (ctx->colour_mode) {
+	case CM_RGB:  colour = rgb_to_hsv(ctx->colour); break;
+	case CM_HSV:  colour = ctx->colour;             break;
+	case CM_LAST: ASSERT(0);                        break;
+	}
+
+	Rect tr  = {
+		.size = {
+			.w = ctx->picker_texture.texture.width,
+			.h = ctx->picker_texture.texture.height
+		}
+	};
+
+	Rect hs1 = cut_rect_left(tr, 0.2);
+	Rect hs2 = cut_rect_middle(tr, 0.2, 0.4);
+	Rect sv  = cut_rect_right(tr, 0.4);
+
+	BeginTextureMode(ctx->picker_texture);
+
+	ClearBackground(ctx->bg);
+
+	v4 hsv[2] = {colour, colour};
+	Rect shs;
+	i32 mode;
+	BeginShaderMode(ctx->picker_shader);
+		/* NOTE: Full H Slider */
+		shs         = hs1;
+		shs.pos.x  += 0.25 * shs.size.x;
+		shs.size.x *= 0.5;
+		shs.pos.y  += 0.01 * shs.size.y;
+		shs.size.y *= 0.98;
+
+		hsv[0].x = 0;
+		hsv[1].x = 1;
+		mode = 0;
+		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
+		SetShaderValue(ctx->picker_shader, ctx->size_id, shs.size.E, SHADER_UNIFORM_VEC2);
+		SetShaderValueV(ctx->picker_shader, ctx->hsv_id, (f32 *)hsv, SHADER_UNIFORM_VEC4, 2);
+		DrawRectangleRec(shs.rr, BLACK);
+	EndShaderMode();
+	DrawRectangleRoundedLinesEx(shs.rr, STACK_ROUNDNESS, 0, 12, ctx->bg);
+	DrawRectangleRoundedLinesEx(shs.rr, STACK_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+
+	v2 start  = {.x = shs.pos.x, .y = shs.pos.y + (colour.x * shs.size.h)};
+	v2 end    = start;
+	end.x    += shs.size.w;
+	DrawLineEx(start.rv, end.rv, 3, BLACK);
+
+	BeginShaderMode(ctx->picker_shader);
+		/* NOTE: Zoomed H Slider */
+		shs         = hs2;
+		shs.pos.x  += 0.25 * shs.size.x;
+		shs.size.x *= 0.5;
+		shs.pos.y  += 0.01 * shs.size.y;
+		shs.size.y *= 0.98;
+
+		f32 fraction = 0.1;
+		if (colour.x - 0.5 * fraction < 0) {
+			hsv[0].x = 0;
+			hsv[1].x = fraction;
+		} else if (colour.x + 0.5 * fraction > 1) {
+			hsv[0].x = 1 - fraction;
+			hsv[1].x = 1;
+		} else {
+			hsv[0].x = colour.x - 0.5 * fraction;
+			hsv[1].x = colour.x + 0.5 * fraction;
+		}
+
+		mode = 0;
+		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
+		SetShaderValue(ctx->picker_shader, ctx->size_id, shs.size.E, SHADER_UNIFORM_VEC2);
+		SetShaderValueV(ctx->picker_shader, ctx->hsv_id, (f32 *)hsv, SHADER_UNIFORM_VEC4, 2);
+		DrawRectangleRec(shs.rr, BLACK);
+	EndShaderMode();
+	DrawRectangleRoundedLinesEx(shs.rr, STACK_ROUNDNESS, 0, 12, ctx->bg);
+	DrawRectangleRoundedLinesEx(shs.rr, STACK_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+
+	f32 scale = (colour.x - hsv[0].x) / (hsv[1].x - hsv[0].x);
+	start  = (v2){.x = shs.pos.x, .y = shs.pos.y + (scale * shs.size.h)};
+	end    = start;
+	end.x += shs.size.w;
+	DrawLineEx(start.rv, end.rv, 3, BLACK);
+
+	BeginShaderMode(ctx->picker_shader);
+		/* NOTE: S-V Plane */
+		sv.pos.y  += 3;
+		sv.pos.x  += 3;
+		sv.size.y -= 6;
+		sv.size.x -= 6;
+		v2 offset = {.x = sv.pos.x};
+		mode = 1;
+		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
+		SetShaderValue(ctx->picker_shader, ctx->size_id, sv.size.E, SHADER_UNIFORM_VEC2);
+		SetShaderValue(ctx->picker_shader, ctx->offset_id, offset.E, SHADER_UNIFORM_VEC2);
+		SetShaderValueV(ctx->picker_shader, ctx->hsv_id, colour.E, SHADER_UNIFORM_VEC4, 1);
+		DrawRectangleRec(sv.rr, BLACK);
+	EndShaderMode();
+
+	DrawRectangleLinesEx(sv.rr, 3, BLACK);
+	v2 cpos = {.x = sv.pos.x + colour.y * sv.size.w, .y = sv.pos.y + colour.z * sv.size.h};
+	DrawCircleV(cpos.rv, 6, BLACK);
+
+	EndTextureMode();
+
+	DrawTextureV(ctx->picker_texture.texture, r.pos.rv, WHITE);
 }
 
 DEBUG_EXPORT void
@@ -572,44 +731,45 @@ do_colour_picker(ColourPickerCtx *ctx)
 		.size = { .w = (f32)ws.w * 0.9, .h = (f32)ws.h * 0.9 / 2 },
 	};
 
-	{
-		Rect ca = cut_rect_left(upper, 0.8);
-		Rect sa = cut_rect_right(upper, 0.8);
-		Rect sb = ca;
 
-		ca.size.h *= 0.15;
-		f32 y_pad  = 0.525 * ca.size.h;
+	Rect ma = cut_rect_left(upper, 0.8);
+	Rect sa = cut_rect_right(upper, 0.8);
+	do_colour_stack(ctx, sa);
 
-		sb.size.h *= 0.1;
-		ca.pos.y  += 1.2 * sb.size.h;
-		do_status_bar(ctx, sb);
-
-		do_colour_stack(ctx, sa);
-
-		if (ctx->flags & CPF_REFILL_TEXTURE) {
-			Rect sr;
-			get_slider_subrects(ca, 0, &sr, 0);
-			if (ctx->hsv_texture.texture.width != (i32)(sr.size.w + 0.5)) {
-				i32 w = sr.size.w + 0.5;
-				i32 h = sr.size.h * 3;
-				h += 3 - (h % 3);
-				UnloadRenderTexture(ctx->hsv_texture);
-				ctx->hsv_texture = LoadRenderTexture(w, h);
-			}
-			fill_hsv_texture(ctx->hsv_texture, ctx->colour);
-			ctx->flags &= ~CPF_REFILL_TEXTURE;
-		}
-
-		for (i32 i = 0; i < 4; i++) {
-			do_slider(ctx, ca, i);
-			ca.pos.y += ca.size.h + y_pad;
-		}
+	switch (ctx->mode) {
+	case CPM_SLIDERS: do_slider_mode(ctx, ma); break;
+	case CPM_PICKER:  do_picker_mode(ctx, ma); break;
+	case CPM_LAST:    ASSERT(0);                  break;
 	}
 
 	{
 		Rect cb    = lower;
 		cb.size.h *= 0.25;
-		cb.pos.y  += 0.02 * lower.size.h;
+		cb.pos.y  += 0.04 * lower.size.h;
 		do_colour_selector(ctx, cb);
+
+		cb.pos.y  += 0.075 * lower.size.h + cb.size.h;
+
+		f32 mode_x_pad = 0.04 * lower.size.w;
+
+		Rect mb    = cb;
+		mb.size.w *= (1.0 / (CPM_LAST + 1) - 0.1);
+		mb.size.w -= 0.5 * mode_x_pad;
+		mb.size.h  = mb.size.w;
+
+		f32 offset = lower.size.w - CPM_LAST * (mb.size.w + 0.5 * mode_x_pad);
+		mb.pos.x  += 0.5 * offset;
+
+		for (u32 i = 0; i < CPM_LAST; i++) {
+			DrawRectangleLinesEx(mb.rr, 3, RED);
+
+			if (CheckCollisionPointRec(ctx->mouse_pos.rv, mb.rr)) {
+				if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+					ctx->mode = i;
+				}
+			}
+
+			mb.pos.x += mb.size.w + mode_x_pad;
+		}
 	}
 }
