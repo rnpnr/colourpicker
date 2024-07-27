@@ -525,6 +525,10 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 
 	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 12, ctx->bg);
 	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+	v2 start  = cs[1].pos;
+	v2 end    = cs[1].pos;
+	end.y    += cs[1].size.h;
+	DrawLineEx(start.rv, end.rv, 3, Fade(BLACK, 0.8));
 
 	if (pressed_idx == 0) {
 		switch (ctx->mode) {
