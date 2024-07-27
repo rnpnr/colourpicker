@@ -69,6 +69,11 @@ typedef struct {
 } ColourStackState;
 
 typedef struct {
+	f32 hex_hover_t;
+	f32 mode_hover_t;
+} StatusBarState;
+
+typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
@@ -76,6 +81,8 @@ typedef struct {
 	i32  font_size;
 	uv2 window_size;
 	Color bg, fg;
+
+	StatusBarState sbs;
 
 	f32 selection_hover_t[2];
 	v4  hover_colour;

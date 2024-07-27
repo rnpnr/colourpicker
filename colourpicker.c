@@ -316,19 +316,27 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 		SetClipboardText(hex);
 
-	static f32 scale_hex = 1.0;
-	f32 scale_target = 1.05;
-	f32 scale_delta  = (scale_target - 1.0) * 8 * ctx->dt;
-	scale_hex = move_towards_f32(scale_hex, hex_collides? scale_target : 1.0, scale_delta);
+	f32 scale = -5;
+	if (hex_collides) scale *= -1;
+
+	ctx->sbs.hex_hover_t += scale * ctx->dt;
+	CLAMP01(ctx->sbs.hex_hover_t);
+
+	scale = -5;
+	if (mode_collides) scale *= -1;
+
+	ctx->sbs.mode_hover_t += scale * ctx->dt;
+	CLAMP01(ctx->sbs.mode_hover_t);
+
+	v4 fg          = normalize_colour(pack_rl_colour(ctx->fg));
+	v4 hex_colour  = lerp_v4(fg, ctx->hover_colour, ctx->sbs.hex_hover_t);
+	v4 mode_colour = lerp_v4(fg, ctx->hover_colour, ctx->sbs.mode_hover_t);
 
 	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
-	fpos = left_align_text_in_rect(hex_r, hex, ctx->font, scale_hex * ctx->font_size);
-	DrawTextEx(ctx->font, hex, fpos.rv, scale_hex * ctx->font_size, 0, ctx->fg);
-
-	static f32 scale_mode = 1.0;
-	scale_mode = move_towards_f32(scale_mode, mode_collides? scale_target : 1.0, scale_delta);
+	fpos = left_align_text_in_rect(hex_r, hex, ctx->font, ctx->font_size);
+	DrawTextEx(ctx->font, hex, fpos.rv, ctx->font_size, 0, colour_from_normalized(hex_colour));
 
 	char *mtext;
 	switch (ctx->mode) {
@@ -336,8 +344,8 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 	case CPM_HSV:  mtext = "HSV"; break;
 	case CPM_LAST: ASSERT(0);     break;
 	}
-	fpos = right_align_text_in_rect(mode_r, mtext, ctx->font, scale_mode * ctx->font_size);
-	DrawTextEx(ctx->font, mtext, fpos.rv, scale_mode * ctx->font_size, 0, ctx->fg);
+	fpos = right_align_text_in_rect(mode_r, mtext, ctx->font, ctx->font_size);
+	DrawTextEx(ctx->font, mtext, fpos.rv, ctx->font_size, 0, colour_from_normalized(mode_colour));
 }
 
 static void
