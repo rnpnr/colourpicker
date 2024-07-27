@@ -143,7 +143,7 @@ get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 }
 
 static void
-do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
+do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 {
 	static i32 held_idx = -1;
 
@@ -154,7 +154,10 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 	v2 fpos = center_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
-	b32 hovering = CheckCollisionPointRec(ctx->mouse_pos.rv, sr.rr);
+	v2 test_pos = ctx->mouse_pos;
+	test_pos.x -= relative_origin.x;
+	test_pos.y -= relative_origin.y;
+	b32 hovering = CheckCollisionPointRec(test_pos.rv, sr.rr);
 
 	if (hovering && held_idx == -1)
 		held_idx = label_idx;
@@ -251,14 +254,17 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 }
 
 static void
-do_status_bar(ColourPickerCtx *ctx, Rect r)
+do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 {
 	Rect hex_r  = cut_rect_left(r, 0.5);
 	Rect mode_r = cut_rect_right(r, 0.85);
 	mode_r.pos.y  += mode_r.size.h * 0.15;
 	mode_r.size.h *= 0.7;
 
-	b32 mode_collides = CheckCollisionPointRec(ctx->mouse_pos.rv, mode_r.rr);
+	v2 test_pos  = ctx->mouse_pos;
+	test_pos.x  -= relative_origin.x;
+	test_pos.y  -= relative_origin.y;
+	b32 mode_collides = CheckCollisionPointRec(test_pos.rv, mode_r.rr);
 	if (mode_collides) {
 		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 			switch (ctx->colour_mode++) {
@@ -293,7 +299,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r)
 	Rect label_r = cut_rect_left(hex_r,  label_size.x / hex_r.size.w);
 	hex_r        = cut_rect_right(hex_r, label_size.x / hex_r.size.w);
 
-	i32 hex_collides = CheckCollisionPointRec(ctx->mouse_pos.rv, hex_r.rr);
+	i32 hex_collides = CheckCollisionPointRec(test_pos.rv, hex_r.rr);
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
 		const char *new = TextToLower(GetClipboardText());
 		u32 r, g, b, a;
@@ -549,20 +555,21 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 }
 
 static void
-do_slider_mode(ColourPickerCtx *ctx, Rect r)
+do_slider_mode(ColourPickerCtx *ctx, v2 relative_origin)
 {
-	Rect sb = r;
-
-	r.size.h  *= 0.15;
-	f32 y_pad  = 0.525 * r.size.h;
-
-	sb.size.h *= 0.1;
-	r.pos.y   += 1.2 * sb.size.h;
-	do_status_bar(ctx, sb);
+	Rect tr  = {
+		.size = {
+			.w = ctx->picker_texture.texture.width,
+			.h = ctx->picker_texture.texture.height
+		}
+	};
+	Rect sb    = tr;
+	Rect ss    = tr;
+	ss.size.h *= 0.15;
 
 	if (ctx->flags & CPF_REFILL_TEXTURE) {
 		Rect sr;
-		get_slider_subrects(r, 0, &sr, 0);
+		get_slider_subrects(ss, 0, &sr, 0);
 		if (ctx->hsv_texture.texture.width != (i32)(sr.size.w + 0.5)) {
 			i32 w = sr.size.w + 0.5;
 			i32 h = sr.size.h * 3;
@@ -574,22 +581,26 @@ do_slider_mode(ColourPickerCtx *ctx, Rect r)
 		ctx->flags &= ~CPF_REFILL_TEXTURE;
 	}
 
+	BeginTextureMode(ctx->slider_texture);
+	ClearBackground(ctx->bg);
+
+	sb.size.h *= 0.1;
+	do_status_bar(ctx, sb, relative_origin);
+
+	ss.pos.y   += 1.2 * sb.size.h;
+	f32 y_pad  = 0.525 * ss.size.h;
+
 	for (i32 i = 0; i < 4; i++) {
-		do_slider(ctx, r, i);
-		r.pos.y += r.size.h + y_pad;
+		do_slider(ctx, ss, i, relative_origin);
+		ss.pos.y += ss.size.h + y_pad;
 	}
+
+	EndTextureMode();
 }
 
 static void
-do_picker_mode(ColourPickerCtx *ctx, Rect r)
+do_picker_mode(ColourPickerCtx *ctx)
 {
-	if (ctx->picker_texture.texture.width != (i32)(r.size.w)) {
-		i32 w = r.size.w;
-		i32 h = r.size.h;
-		UnloadRenderTexture(ctx->picker_texture);
-		ctx->picker_texture = LoadRenderTexture(w, h);
-	}
-
 	if (!IsShaderReady(ctx->picker_shader)) {
 		/* TODO: LoadShaderFromMemory */
 		ctx->picker_shader = LoadShader(0, "./picker_shader.glsl");
@@ -703,8 +714,6 @@ do_picker_mode(ColourPickerCtx *ctx, Rect r)
 	DrawCircleV(cpos.rv, 6, BLACK);
 
 	EndTextureMode();
-
-	DrawTextureV(ctx->picker_texture.texture, r.pos.rv, WHITE);
 }
 
 DEBUG_EXPORT void
@@ -732,14 +741,54 @@ do_colour_picker(ColourPickerCtx *ctx)
 	};
 
 
+
+
 	Rect ma = cut_rect_left(upper, 0.8);
 	Rect sa = cut_rect_right(upper, 0.8);
 	do_colour_stack(ctx, sa);
 
-	switch (ctx->mode) {
-	case CPM_SLIDERS: do_slider_mode(ctx, ma); break;
-	case CPM_PICKER:  do_picker_mode(ctx, ma); break;
-	case CPM_LAST:    ASSERT(0);                  break;
+	{
+		if (ctx->picker_texture.texture.width != (i32)(ma.size.w)) {
+			i32 w = ma.size.w;
+			i32 h = ma.size.h;
+			UnloadRenderTexture(ctx->picker_texture);
+			ctx->picker_texture = LoadRenderTexture(w, h);
+			if (ctx->mode != CPM_PICKER)
+				do_picker_mode(ctx);
+		}
+
+		if (ctx->slider_texture.texture.width != (i32)(ma.size.w)) {
+			i32 w = ma.size.w;
+			i32 h = ma.size.h;
+			UnloadRenderTexture(ctx->slider_texture);
+			ctx->slider_texture = LoadRenderTexture(w, h);
+			if (ctx->mode != CPM_SLIDERS)
+				do_slider_mode(ctx, ma.pos);
+		}
+	}
+
+	{
+		Rect tr = {0};
+		NPatchInfo tnp;
+		switch (ctx->mode) {
+		case CPM_SLIDERS:
+			do_slider_mode(ctx, ma.pos);
+			tr.size = (v2){
+				.w = ctx->slider_texture.texture.width,
+				.h = -ctx->slider_texture.texture.height
+			};
+			tnp = (NPatchInfo){ tr.rr, 0, 0, 0, 0, NPATCH_NINE_PATCH };
+			DrawTextureNPatch(ctx->slider_texture.texture, tnp, ma.rr, (Vector2){0},
+			                  0, WHITE);
+			break;
+		case CPM_PICKER:
+			do_picker_mode(ctx);
+			DrawTextureV(ctx->picker_texture.texture, ma.pos.rv, WHITE);
+			break;
+		case CPM_LAST:
+			ASSERT(0);
+			break;
+		}
 	}
 
 	{
