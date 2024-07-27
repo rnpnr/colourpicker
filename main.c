@@ -80,7 +80,7 @@ static f32
 parse_f32(char *s)
 {
 	f32 res = atof(s);
-	return CLAMP(res, 0, 1);
+	return CLAMP01(res);
 }
 
 static u32
@@ -138,13 +138,8 @@ main(i32 argc, char *argv[])
 			},
 		},
 	};
-	/* TODO: store fg/bg as v4? */
-	u32 fg_packed_rgba = ctx.fg.r << 24 | ctx.fg.g << 16 | ctx.fg.b << 8 | ctx.fg.a << 0;
-	v4 fg              = normalize_colour(fg_packed_rgba);
 
-	ctx.previous_colour      = hsv_to_rgb(ctx.colour);
-	ctx.selection_colours[0] = fg;
-	ctx.selection_colours[1] = fg;
+	ctx.previous_colour = hsv_to_rgb(ctx.colour);
 
 	{
 		v4 rgb = hsv_to_rgb(ctx.colour);

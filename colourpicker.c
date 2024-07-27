@@ -25,24 +25,13 @@ move_towards_f32(f32 current, f32 target, f32 delta)
 }
 
 static v4
-move_towards_v4(v4 current, v4 target, v4 delta)
+lerp_v4(v4 a, v4 b, f32 t)
 {
 	return (v4){
-		.x = move_towards_f32(current.x, target.x, delta.x),
-		.y = move_towards_f32(current.y, target.y, delta.y),
-		.z = move_towards_f32(current.z, target.z, delta.z),
-		.w = move_towards_f32(current.w, target.w, delta.w),
-	};
-}
-
-static v4
-scaled_sub_v4(v4 a, v4 b, f32 scale)
-{
-	return (v4){
-		.x = scale * (a.x - b.x),
-		.y = scale * (a.y - b.y),
-		.z = scale * (a.z - b.z),
-		.w = scale * (a.w - b.w),
+		.x = a.x + t * (b.x - a.x),
+		.y = a.y + t * (b.y - a.y),
+		.z = a.z + t * (b.z - a.z),
+		.w = a.w + t * (b.w - a.w),
 	};
 }
 
@@ -176,7 +165,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx)
 		if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
 			current = (ctx->mouse_pos.x - sr.pos.x) / sr.size.w;
 		current += wheel / 255;
-		CLAMP(current, 0.0, 1.0);
+		CLAMP01(current);
 		ctx->colour.E[held_idx] = current;
 		switch (ctx->mode) {
 		case CPM_HSV: ctx->flags |= CPF_REFILL_TEXTURE; break;
@@ -498,20 +487,22 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 
 	v4 fg     = normalize_colour(pack_rl_colour(ctx->fg));
 	f32 scale = 5;
-	v4 delta  = scaled_sub_v4(fg, ctx->hover_colour, scale * ctx->dt);
 	char *labels[2] = {"Revert", "Apply"};
 
 	i32 pressed_idx = -1;
 	for (i32 i = 0; i < ARRAY_COUNT(cs); i++) {
 		if (CheckCollisionPointRec(ctx->mouse_pos.rv, cs[i].rr)) {
-			ctx->selection_colours[i] = move_towards_v4(ctx->selection_colours[i],
-			                                            ctx->hover_colour, delta);
+			ctx->selection_hover_t[i] += scale * ctx->dt;
+
 			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 				pressed_idx = i;
 		} else {
-			ctx->selection_colours[i] = move_towards_v4(ctx->selection_colours[i],
-			                                            fg, delta);
+			ctx->selection_hover_t[i] -= scale * ctx->dt;
 		}
+
+		CLAMP01(ctx->selection_hover_t[i]);
+
+		v4 colour = lerp_v4(fg, ctx->hover_colour, ctx->selection_hover_t[i]);
 
 		v2 fpos = center_align_text_in_rect(cs[i], labels[i], ctx->font, ctx->font_size);
 		v2 pos  = fpos;
@@ -519,7 +510,7 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 		pos.y  += 2.5;
 		DrawTextEx(ctx->font, labels[i], pos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
 		DrawTextEx(ctx->font, labels[i], fpos.rv, ctx->font_size, 0,
-		           colour_from_normalized(ctx->selection_colours[i]));
+		           colour_from_normalized(colour));
 	}
 
 	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 12, ctx->bg);

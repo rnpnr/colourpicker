@@ -77,8 +77,8 @@ typedef struct {
 	uv2 window_size;
 	Color bg, fg;
 
-	v4 selection_colours[2];
-	v4 hover_colour;
+	f32 selection_hover_t[2];
+	v4  hover_colour;
 
 	v2 mouse_pos;
 
@@ -93,6 +93,7 @@ typedef struct {
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(*a))
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
+#define CLAMP01(a)     CLAMP(a, 0, 1)
 
 #define ISDIGIT(a)     ((a) >= '0' && (a) <= '9')
 #define ISHEX(a)       (ISDIGIT(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
