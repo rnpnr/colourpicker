@@ -80,6 +80,10 @@ typedef struct {
 	v4 selection_colours[2];
 	v4 hover_colour;
 
+	v2 mouse_pos;
+
+	f32 dt;
+
 	RenderTexture hsv_texture;
 
 	u32  flags;
