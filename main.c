@@ -107,17 +107,6 @@ parse_u32(char *s)
 	return res;
 }
 
-static v4
-normalize_colour(u32 rgba)
-{
-	return (v4){
-		.r = ((rgba >> 24) & 0xFF) / 255.0f,
-		.g = ((rgba >> 16) & 0xFF) / 255.0f,
-		.b = ((rgba >>  8) & 0xFF) / 255.0f,
-		.a = ((rgba >>  0) & 0xFF) / 255.0f,
-	};
-}
-
 int
 main(i32 argc, char *argv[])
 {
@@ -131,6 +120,8 @@ main(i32 argc, char *argv[])
 
 		.bg = { .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff },
 		.fg = { .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff },
+
+		.hover_colour = {.r = 0.85, .g = 0.38, .b = 0.38, .a = 1.00},
 
 		.colour_stack = {
 			.fade_param = 1.0f,
@@ -147,6 +138,13 @@ main(i32 argc, char *argv[])
 			},
 		},
 	};
+	/* TODO: store fg/bg as v4? */
+	u32 fg_packed_rgba = ctx.fg.r << 24 | ctx.fg.g << 16 | ctx.fg.b << 8 | ctx.fg.a << 0;
+	v4 fg              = normalize_colour(fg_packed_rgba);
+
+	ctx.previous_colour      = hsv_to_rgb(ctx.colour);
+	ctx.selection_colours[0] = fg;
+	ctx.selection_colours[1] = fg;
 
 	{
 		v4 rgb = hsv_to_rgb(ctx.colour);
@@ -182,7 +180,7 @@ main(i32 argc, char *argv[])
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 
-	ctx.font_size = 38;
+	ctx.font_size = 40;
 	ctx.font      = LoadFontEx("assets/Lora-SemiBold.ttf", ctx.font_size, 0, 0);
 
 	ctx.hsv_texture = LoadRenderTexture(360, 360);
@@ -205,7 +203,7 @@ main(i32 argc, char *argv[])
 	Color rl        = colour_from_normalized(rgba);
 	u32 packed_rgba = rl.r << 24 | rl.g << 16 | rl.b << 8 | rl.a << 0;
 
-	printf("0x%08X|{.r = %0.02f, .g = %0.02f, .b = %0.02f, .a = %0.02f}\n",
+	printf("0x%08X|{.r = %0.03f, .g = %0.03f, .b = %0.03f, .a = %0.03f}\n",
 	       packed_rgba, rgba.r, rgba.g, rgba.b, rgba.a);
 
 	return 0;

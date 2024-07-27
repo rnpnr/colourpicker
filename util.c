@@ -69,13 +69,16 @@ typedef struct {
 } ColourStackState;
 
 typedef struct {
-	v4 colour;
+	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
 	Font font;
 	i32  font_size;
 	uv2 window_size;
 	Color bg, fg;
+
+	v4 selection_colours[2];
+	v4 hover_colour;
 
 	RenderTexture hsv_texture;
 
@@ -175,6 +178,17 @@ hsv_to_rgb(v4 hsv)
 	rgba.a = hsv.a;
 
 	return rgba;
+}
+
+static v4
+normalize_colour(u32 rgba)
+{
+	return (v4){
+		.r = ((rgba >> 24) & 0xFF) / 255.0f,
+		.g = ((rgba >> 16) & 0xFF) / 255.0f,
+		.b = ((rgba >>  8) & 0xFF) / 255.0f,
+		.a = ((rgba >>  0) & 0xFF) / 255.0f,
+	};
 }
 
 #endif /* _UTIL_C_ */
