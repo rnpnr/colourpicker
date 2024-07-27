@@ -576,10 +576,10 @@ do_colour_picker(ColourPickerCtx *ctx)
 		Rect sb = ca;
 
 		ca.size.h *= 0.15;
-		f32 y_pad  = 0.55 * ca.size.h;
+		f32 y_pad  = 0.525 * ca.size.h;
 
 		sb.size.h *= 0.1;
-		sb.pos.y  += upper.size.h - sb.size.h;
+		ca.pos.y  += 1.2 * sb.size.h;
 		do_status_bar(ctx, sb);
 
 		do_colour_stack(ctx, sa);
