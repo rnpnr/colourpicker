@@ -157,8 +157,10 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, f32 dt)
 		current += wheel / 255;
 		CLAMP(current, 0.0, 1.0);
 		ctx->colour.E[held_idx] = current;
-		if (ctx->mode == CPM_HSV)
-			ctx->flags |= CPF_REFILL_TEXTURE;
+		switch (ctx->mode) {
+		case CPM_HSV: ctx->flags |= CPF_REFILL_TEXTURE; break;
+		default: break;
+		}
 	}
 
 	if (IsMouseButtonUp(MOUSE_BUTTON_LEFT))
@@ -251,23 +253,29 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 	b32 mode_collides = CheckCollisionPointRec(mouse.rv, mode_r.rr);
 	if (mode_collides) {
 		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-			if (ctx->mode == CPM_HSV) {
-				ctx->mode = CPM_RGB;
-				ctx->colour = hsv_to_rgb(ctx->colour);
-			} else {
-				ctx->mode++;
-				ctx->flags |= CPF_REFILL_TEXTURE;
-				ctx->colour = rgb_to_hsv(ctx->colour);
+			switch (ctx->mode++) {
+			case CPM_HSV:
+				ctx->mode    = CPM_RGB;
+				ctx->colour  = hsv_to_rgb(ctx->colour);
+				break;
+			case CPM_RGB:
+				ctx->flags  |= CPF_REFILL_TEXTURE;
+				ctx->colour  = rgb_to_hsv(ctx->colour);
+				break;
+			case CPM_LAST: ASSERT(0); break;
 			}
 		}
 		if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-			if (ctx->mode == CPM_RGB) {
-				ctx->mode = CPM_HSV;
-				ctx->colour = rgb_to_hsv(ctx->colour);
-			} else {
-				ctx->flags |= CPF_REFILL_TEXTURE;
-				ctx->mode--;
-				ctx->colour = hsv_to_rgb(ctx->colour);
+			switch (ctx->mode--) {
+			case CPM_HSV:
+				ctx->colour  = hsv_to_rgb(ctx->colour);
+				break;
+			case CPM_RGB:
+				ctx->mode    = CPM_HSV;
+				ctx->colour  = rgb_to_hsv(ctx->colour);
+				ctx->flags  |= CPF_REFILL_TEXTURE;
+				break;
+			case CPM_LAST: ASSERT(0); break;
 			}
 		}
 	}
@@ -283,15 +291,18 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, f32 dt)
 		u32 r, g, b, a;
 		sscanf(new, "%02x%02x%02x%02x", &r, &g, &b, &a);
 		ctx->colour.rv = ColorNormalize((Color){ .r = r, .g = g, .b = b, .a = a });
-		if (ctx->mode == CPM_HSV)
-			ctx->colour = rgb_to_hsv(ctx->colour);
+		switch (ctx->mode) {
+		case CPM_HSV: ctx->colour = rgb_to_hsv(ctx->colour); break;
+		default: break;
+		}
 	}
 
 	Color hc;
-	if (ctx->mode == CPM_HSV)
-		hc = colour_from_normalized(hsv_to_rgb(ctx->colour));
-	else
-		hc = colour_from_normalized(ctx->colour);
+	switch (ctx->mode) {
+	case CPM_HSV:  hc = colour_from_normalized(hsv_to_rgb(ctx->colour)); break;
+	case CPM_RGB:  hc = colour_from_normalized(ctx->colour);             break;
+	case CPM_LAST: ASSERT(0); break;
+	}
 	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
@@ -333,11 +344,17 @@ do_colour_stack_item(ColourPickerCtx *ctx, v2 mouse, Rect r, i32 item_idx, b32 f
 
 	b32 stack_collides = CheckCollisionPointRec(mouse.rv, r.rr);
 	if (stack_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		if (ctx->mode == CPM_HSV) {
+		switch (ctx->mode) {
+		case CPM_HSV:
 			ctx->colour = rgb_to_hsv(colour);
 			ctx->flags |= CPF_REFILL_TEXTURE;
-		} else {
+			break;
+		case CPM_RGB:
 			ctx->colour = colour;
+			break;
+		case CPM_LAST:
+			ASSERT(0);
+			break;
 		}
 	}
 
@@ -435,8 +452,10 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa, f32 dt)
 	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		css->fade_param -= 1e-6;
 		v4 colour  = ctx->colour;
-		if (ctx->mode == CPM_HSV)
-			colour = hsv_to_rgb(colour);
+		switch (ctx->mode) {
+		case CPM_HSV: colour = hsv_to_rgb(colour); break;
+		default: break;
+		}
 
 		css->last = css->items[css->widx];
 		css->items[css->widx++] = colour;
@@ -472,8 +491,13 @@ do_colour_picker(ColourPickerCtx *ctx)
 		Rect ca = cut_rect_left(upper, 0.8);
 		Rect sa = cut_rect_right(upper, 0.8);
 
-		v4 vcolour = ctx->mode == CPM_HSV ? hsv_to_rgb(ctx->colour) : ctx->colour;
-		Color colour = colour_from_normalized(vcolour);
+		Color colour = {0};
+		switch (ctx->mode) {
+		case CPM_HSV:  colour = colour_from_normalized(hsv_to_rgb(ctx->colour)); break;
+		case CPM_RGB:  colour = colour_from_normalized(ctx->colour);             break;
+		case CPM_LAST: ASSERT(0); break;
+		}
+
 		v2 cc = { .x = ca.pos.x + 0.47 * ca.size.w, .y = ca.pos.y + 0.5 * ca.size.h };
 		DrawRing(cc.rv, 0.4 * ca.size.w, 0.42 * ca.size.w, 0, 360, 69, Fade(BLACK, 0.5));
 		DrawCircleSector(cc.rv, 0.4 * ca.size.w, 0, 360, 69, colour);
