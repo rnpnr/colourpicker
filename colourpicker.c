@@ -496,8 +496,7 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	DrawRectangleRec(cs[0].rr, pcolour);
 	DrawRectangleRec(cs[1].rr, colour);
 
-	u32 fg_packed_rgba = ctx->fg.r << 24 | ctx->fg.g << 16 | ctx->fg.b << 8 | ctx->fg.a << 0;
-	v4 fg     = normalize_colour(fg_packed_rgba);
+	v4 fg     = normalize_colour(pack_rl_colour(ctx->fg));
 	f32 scale = 5;
 	v4 delta  = scaled_sub_v4(fg, ctx->hover_colour, scale * ctx->dt);
 	char *labels[2] = {"Revert", "Apply"};

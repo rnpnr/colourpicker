@@ -195,4 +195,10 @@ normalize_colour(u32 rgba)
 	};
 }
 
+static u32
+pack_rl_colour(Color colour)
+{
+	return colour.r << 24 | colour.g << 16 | colour.b << 8 | colour.a << 0;
+}
+
 #endif /* _UTIL_C_ */

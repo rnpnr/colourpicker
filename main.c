@@ -200,9 +200,7 @@ main(i32 argc, char *argv[])
 	default:      ASSERT(0);                     break;
 	}
 
-	Color rl        = colour_from_normalized(rgba);
-	u32 packed_rgba = rl.r << 24 | rl.g << 16 | rl.b << 8 | rl.a << 0;
-
+	u32 packed_rgba = pack_rl_colour(colour_from_normalized(rgba));
 	printf("0x%08X|{.r = %0.03f, .g = %0.03f, .b = %0.03f, .a = %0.03f}\n",
 	       packed_rgba, rgba.r, rgba.g, rgba.b, rgba.a);
 
