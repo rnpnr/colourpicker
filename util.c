@@ -80,6 +80,12 @@ typedef struct {
 } StatusBarState;
 
 typedef struct {
+	f32 scales[CPM_LAST];
+	f32 mode_visible_t;
+	i32 next_mode;
+} ModeChangeState;
+
+typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
@@ -88,7 +94,8 @@ typedef struct {
 	uv2 window_size;
 	Color bg, fg;
 
-	StatusBarState sbs;
+	StatusBarState  sbs;
+	ModeChangeState mcs;
 
 	f32 selection_hover_t[2];
 	v4  hover_colour;

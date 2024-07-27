@@ -55,12 +55,13 @@ right_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
 }
 
 static Rect
-scale_rect_centered(Rect r, f32 scale)
+scale_rect_centered(Rect r, v2 scale)
 {
-	r.pos.x  += ABS(1 - scale) / 2 * r.size.w;
-	r.pos.y  += ABS(1 - scale) / 2 * r.size.h;
-	r.size.h *= scale;
-	r.size.w *= scale;
+	Rect or   = r;
+	r.size.w *= scale.x;
+	r.size.h *= scale.y;
+	r.pos.x  += (or.size.w - r.size.w) / 2;
+	r.pos.y  += (or.size.h - r.size.h) / 2;
 	return r;
 }
 
@@ -393,7 +394,7 @@ do_colour_stack_item(ColourPickerCtx *ctx, Rect r, i32 item_idx, b32 fade)
 	};
 	Color disp = colour_from_normalized(colour);
 	DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, Fade(disp, 1 - fade_param));
-	draw_rect = scale_rect_centered(draw_rect, 0.96);
+	draw_rect = scale_rect_centered(draw_rect, (v2){.x = 0.96, .y = 0.96});
 	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0, Fade(BLACK, 1 - fade_param));
 }
 
@@ -637,11 +638,7 @@ do_picker_mode(ColourPickerCtx *ctx)
 	i32 mode;
 	BeginShaderMode(ctx->picker_shader);
 		/* NOTE: Full H Slider */
-		shs         = hs1;
-		shs.pos.x  += 0.25 * shs.size.x;
-		shs.size.x *= 0.5;
-		shs.pos.y  += 0.01 * shs.size.y;
-		shs.size.y *= 0.98;
+		shs = scale_rect_centered(hs1, (v2){.x = 0.5, .y = 0.98});
 
 		hsv[0].x = 0;
 		hsv[1].x = 1;
@@ -661,11 +658,7 @@ do_picker_mode(ColourPickerCtx *ctx)
 
 	BeginShaderMode(ctx->picker_shader);
 		/* NOTE: Zoomed H Slider */
-		shs         = hs2;
-		shs.pos.x  += 0.25 * shs.size.x;
-		shs.size.x *= 0.5;
-		shs.pos.y  += 0.01 * shs.size.y;
-		shs.size.y *= 0.98;
+		shs = scale_rect_centered(hs2, (v2){.x = 0.5, .y = 0.98});
 
 		f32 fraction = 0.1;
 		if (colour.x - 0.5 * fraction < 0) {
@@ -730,18 +723,15 @@ do_colour_picker(ColourPickerCtx *ctx)
 
 	uv2 ws = ctx->window_size;
 
-	v2 pad = { .x = 0.05 * (f32)ws.w, .y = 0.05 * (f32)ws.h };
+	v2 pad = {.x = 0.05 * ws.w, .y = 0.05 * ws.h};
 	Rect upper = {
-		.pos  = { .x = pad.x, .y = pad.y },
-		.size = { .w = (f32)ws.w * 0.9, .h = (f32)ws.h * 0.9 / 2 },
+		.pos  = {.x = pad.x,            .y = pad.y},
+		.size = {.w = ws.w - 2 * pad.x, .h = ws.h * 0.6},
 	};
 	Rect lower = {
-		.pos  = { .x = pad.x, .y = pad.y + (f32)ws.h * 0.9 / 2, },
-		.size = { .w = (f32)ws.w * 0.9, .h = (f32)ws.h * 0.9 / 2 },
+		.pos  = {.x = pad.x,            .y = pad.y + ws.h * 0.6},
+		.size = {.w = ws.w - 2 * pad.x, .h = ws.h * 0.4 - 1 * pad.y},
 	};
-
-
-
 
 	Rect ma = cut_rect_left(upper, 0.8);
 	Rect sa = cut_rect_right(upper, 0.8);
@@ -789,6 +779,7 @@ do_colour_picker(ColourPickerCtx *ctx)
 			ASSERT(0);
 			break;
 		}
+		DrawRectangleRec(ma.rr, Fade(ctx->bg, 1 - ctx->mcs.mode_visible_t));
 	}
 
 	{
@@ -797,8 +788,6 @@ do_colour_picker(ColourPickerCtx *ctx)
 		cb.pos.y  += 0.04 * lower.size.h;
 		do_colour_selector(ctx, cb);
 
-		cb.pos.y  += 0.075 * lower.size.h + cb.size.h;
-
 		f32 mode_x_pad = 0.04 * lower.size.w;
 
 		Rect mb    = cb;
@@ -806,19 +795,63 @@ do_colour_picker(ColourPickerCtx *ctx)
 		mb.size.w -= 0.5 * mode_x_pad;
 		mb.size.h  = mb.size.w;
 
+		mb.pos.y  += lower.size.h * 0.75 / 2;
+
 		f32 offset = lower.size.w - CPM_LAST * (mb.size.w + 0.5 * mode_x_pad);
 		mb.pos.x  += 0.5 * offset;
 
-		for (u32 i = 0; i < CPM_LAST; i++) {
-			DrawRectangleLinesEx(mb.rr, 3, RED);
+		Rect tr = {
+			.size = {
+				.w =  ctx->slider_texture.texture.width,
+				.h = -ctx->slider_texture.texture.height
+			}
+		};
 
+		NPatchInfo tnp = {tr.rr, 0, 0, 0, 0, NPATCH_NINE_PATCH };
+		for (u32 i = 0; i < CPM_LAST; i++) {
 			if (CheckCollisionPointRec(ctx->mouse_pos.rv, mb.rr)) {
 				if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-					ctx->mode = i;
+					if (ctx->mode != i)
+						ctx->mcs.next_mode = i;
 				}
+				ctx->mcs.scales[i] = move_towards_f32(ctx->mcs.scales[i], 1.1,
+				                                      ctx->dt);
+			} else {
+				ctx->mcs.scales[i] = move_towards_f32(ctx->mcs.scales[i], 1,
+				                                      ctx->dt);
 			}
 
-			mb.pos.x += mb.size.w + mode_x_pad;
+			f32 scaled_dt = 2 * ctx->dt;
+			f32 mvt = ctx->mcs.mode_visible_t;
+			if (ctx->mcs.next_mode != -1) {
+				ctx->mcs.mode_visible_t = move_towards_f32(mvt, 0, scaled_dt);
+				if (ctx->mcs.mode_visible_t == 0) {
+					ctx->mode = ctx->mcs.next_mode;
+					ctx->mcs.next_mode = -1;
+				}
+			} else {
+				ctx->mcs.mode_visible_t = move_towards_f32(mvt, 1, scaled_dt);
+			}
+
+			Texture *texture = NULL;
+			switch (i) {
+			case CPM_PICKER:  texture = &ctx->picker_texture.texture; break;
+			case CPM_SLIDERS: texture = &ctx->slider_texture.texture; break;
+			case CPM_LAST: break;
+			}
+			ASSERT(texture);
+
+			f32 scale      = ctx->mcs.scales[i];
+			Rect txt_out   = scale_rect_centered(mb, (v2){.x = 0.8 * scale,
+			                                              .y = 0.8 * scale});
+			Rect outline_r = scale_rect_centered(mb, (v2){.x = scale, .y = scale});
+
+			DrawTextureNPatch(*texture, tnp, txt_out.rr, (Vector2){0}, 0, WHITE);
+			DrawRectangleRoundedLinesEx(outline_r.rr, STACK_ROUNDNESS, 0, 3,
+			                            Fade(BLACK, 0.8));
+
+			mb.pos.x      += mb.size.w + mode_x_pad;
+			txt_out.pos.x += mb.size.w + mode_x_pad;
 		}
 	}
 }

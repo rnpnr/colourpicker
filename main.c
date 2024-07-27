@@ -111,7 +111,7 @@ int
 main(i32 argc, char *argv[])
 {
 	ColourPickerCtx ctx = {
-		.window_size = { .w = 720, .h = 960 },
+		.window_size = { .w = 720, .h = 860 },
 
 		.mode        = CPM_PICKER,
 		.colour_mode = CM_HSV,
@@ -139,6 +139,11 @@ main(i32 argc, char *argv[])
 			},
 		},
 	};
+
+	ctx.mcs.mode_visible_t = 1;
+	ctx.mcs.next_mode      = -1;
+	for (u32 i = 0; i < CPM_LAST; i++)
+		ctx.mcs.scales[i] = 1;
 
 	ctx.previous_colour = hsv_to_rgb(ctx.colour);
 
