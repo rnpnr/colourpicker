@@ -252,8 +252,9 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		}
 	}
 
-	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 12, ctx->bg);
-	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 4 * SLIDER_BORDER_WIDTH, ctx->bg);
+	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, SLIDER_BORDER_WIDTH,
+	                            SLIDER_BORDER_COLOUR);
 
 	{
 		/* TODO: move this to ctx */
@@ -425,7 +426,8 @@ do_colour_stack_item(ColourPickerCtx *ctx, Rect r, i32 item_idx, b32 fade)
 	Color disp = colour_from_normalized(colour);
 	DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, Fade(disp, 1 - fade_param));
 	draw_rect = scale_rect_centered(draw_rect, (v2){.x = 0.96, .y = 0.96});
-	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0, Fade(BLACK, 1 - fade_param));
+	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, STACK_BORDER_WIDTH,
+	                            Fade(STACK_BORDER_COLOUR, 1 - fade_param));
 }
 
 static void
@@ -450,8 +452,8 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 		r.pos.y += y_pos_delta;
 		Color old = Fade(colour_from_normalized(css->last), css->fade_param);
 		DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, old);
-		DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, 3.0,
-		                            Fade(BLACK, css->fade_param));
+		DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, STACK_BORDER_WIDTH,
+		                            Fade(STACK_BORDER_COLOUR, css->fade_param));
 	}
 
 	u32 loop_items = ARRAY_COUNT(css->items) - 1;
@@ -542,12 +544,13 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 		           colour_from_normalized(colour));
 	}
 
-	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 12, ctx->bg);
-	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+	DrawRectangleRoundedLinesEx(r.rr, SELECTOR_ROUNDNESS, 0, 4 * SELECTOR_BORDER_WIDTH, ctx->bg);
+	DrawRectangleRoundedLinesEx(r.rr, SELECTOR_ROUNDNESS, 0, SELECTOR_BORDER_WIDTH,
+	                            SELECTOR_BORDER_COLOUR);
 	v2 start  = cs[1].pos;
 	v2 end    = cs[1].pos;
 	end.y    += cs[1].size.h;
-	DrawLineEx(start.rv, end.rv, 3, Fade(BLACK, 0.8));
+	DrawLineEx(start.rv, end.rv, SELECTOR_BORDER_WIDTH, SELECTOR_BORDER_COLOUR);
 
 	if (pressed_idx == 0) {
 		switch (ctx->colour_mode) {
@@ -659,8 +662,9 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 
 	EndShaderMode();
 
-	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 12, ctx->bg);
-	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 4 * SLIDER_BORDER_WIDTH, ctx->bg);
+	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, SLIDER_BORDER_WIDTH,
+	                            SLIDER_BORDER_COLOUR);
 
 	f32 param = (colour.x - top_colour.x) / (bot_colour.x - top_colour.x);
 	{
@@ -753,10 +757,10 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 
 	BeginShaderMode(ctx->picker_shader);
 		/* NOTE: S-V Plane */
-		sv.pos.y  += 3;
-		sv.pos.x  += 3;
-		sv.size.y -= 6;
-		sv.size.x -= 6;
+		sv.pos.y  += SLIDER_BORDER_WIDTH;
+		sv.pos.x  += SLIDER_BORDER_WIDTH;
+		sv.size.y -= 2 * SLIDER_BORDER_WIDTH;
+		sv.size.x -= 2 * SLIDER_BORDER_WIDTH;
 		v2 offset = {.x = sv.pos.x};
 
 		b32 hovering = CheckCollisionPointRec(test_pos.rv, sv.rr);
@@ -778,7 +782,7 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 		DrawRectangleRec(sv.rr, BLACK);
 	EndShaderMode();
 
-	DrawRectangleLinesEx(sv.rr, 3, BLACK);
+	DrawRectangleLinesEx(sv.rr, SLIDER_BORDER_WIDTH, SLIDER_BORDER_COLOUR);
 
 	f32 radius = 4;
 	v2  param  = {.x = colour.y, .y = 1 - colour.z};
@@ -989,8 +993,8 @@ do_colour_picker(ColourPickerCtx *ctx)
 			Rect outline_r = scale_rect_centered(mb, (v2){.x = scale, .y = scale});
 
 			DrawTextureNPatch(*texture, tnp, txt_out.rr, (Vector2){0}, 0, WHITE);
-			DrawRectangleRoundedLinesEx(outline_r.rr, STACK_ROUNDNESS, 0, 3,
-			                            Fade(BLACK, 0.8));
+			DrawRectangleRoundedLinesEx(outline_r.rr, SELECTOR_ROUNDNESS, 0,
+			                            SELECTOR_BORDER_WIDTH, SELECTOR_BORDER_COLOUR);
 
 			mb.pos.x      += mb.size.w + mode_x_pad;
 			txt_out.pos.x += mb.size.w + mode_x_pad;

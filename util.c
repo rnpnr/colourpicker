@@ -65,10 +65,19 @@ enum colour_picker_flags {
 
 enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
-#define SLIDER_ROUNDNESS 0.5f
-#define SLIDER_TRI_SIZE  (v2){.x = 6, .y = 8}
+#define SLIDER_BORDER_WIDTH    3.0f
+#define SLIDER_BORDER_COLOUR   (Color){.r = 0x00, .g = 0x00, .b = 0x00, .a = 0xCC}
+#define SLIDER_ROUNDNESS       0.5f
+#define SLIDER_TRI_SIZE        (v2){.x = 6, .y = 8}
 
-#define STACK_ROUNDNESS    0.3f
+#define STACK_BORDER_WIDTH     SLIDER_BORDER_WIDTH
+#define STACK_BORDER_COLOUR    SLIDER_BORDER_COLOUR
+#define STACK_ROUNDNESS        0.3f
+
+#define SELECTOR_BORDER_WIDTH  SLIDER_BORDER_WIDTH
+#define SELECTOR_BORDER_COLOUR SLIDER_BORDER_COLOUR
+#define SELECTOR_ROUNDNESS     0.3f
+
 #define COLOUR_STACK_ITEMS 8
 typedef struct {
 	v4  last;
