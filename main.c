@@ -117,7 +117,9 @@ main(i32 argc, char *argv[])
 		.colour_mode = CM_HSV,
 		.flags       = CPF_REFILL_TEXTURE,
 
-		.colour = { .r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0 },
+		.colour   = {.r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0},
+
+		.mcs = {.mode_visible_t = 1, .next_mode = -1},
 
 		.bg = { .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff },
 		.fg = { .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff },
@@ -140,18 +142,14 @@ main(i32 argc, char *argv[])
 		},
 	};
 
-	ctx.mcs.mode_visible_t = 1;
-	ctx.mcs.next_mode      = -1;
 	for (u32 i = 0; i < CPM_LAST; i++)
 		ctx.mcs.scales[i] = 1;
-
-	ctx.previous_colour = hsv_to_rgb(ctx.colour);
 
 	{
 		v4 rgb = hsv_to_rgb(ctx.colour);
 		for (i32 i = 1; i < argc; i++) {
 			if (argv[i][0] == '-') {
-				if (!argv[i + 1] || !ISDIGIT(argv[i + 1][0]) ||
+				if (argv[i + 1] == NULL ||
 				    (argv[i][1] == 'h' && !ISHEX(argv[i + 1][0])))
 					usage(argv[0]);
 
@@ -173,6 +171,8 @@ main(i32 argc, char *argv[])
 		}
 		ctx.colour = rgb_to_hsv(rgb);
 	}
+	ctx.pms.base_hue    = ctx.colour.x;
+	ctx.previous_colour = hsv_to_rgb(ctx.colour);
 
 	#ifndef _DEBUG
 	SetTraceLogLevel(LOG_NONE);

@@ -86,6 +86,11 @@ typedef struct {
 } ModeChangeState;
 
 typedef struct {
+	f32 base_hue;
+	f32 fractional_hue;
+} PickerModeState;
+
+typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
@@ -96,6 +101,9 @@ typedef struct {
 
 	StatusBarState  sbs;
 	ModeChangeState mcs;
+	PickerModeState pms;
+
+	i32 held_idx;
 
 	f32 selection_hover_t[2];
 	v4  hover_colour;

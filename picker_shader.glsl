@@ -26,7 +26,6 @@ vec3 hsv2rgb(vec3 hsv)
 void main()
 {
 	vec2 pos = (gl_FragCoord.xy - u_offset) / u_size;
-	pos.y    = 1 - pos.y;
 
 	vec4 out_hsv;
 	switch (u_mode) {
