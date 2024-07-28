@@ -101,6 +101,47 @@ cut_rect_right(Rect r, f32 fraction)
 }
 
 static void
+draw_cardinal_triangle(v2 midpoint, v2 size, v2 scale, enum cardinal_direction direction,
+                       Color colour)
+{
+	v2 t1, t2;
+	switch (direction) {
+	case NORTH:
+		t1.x = midpoint.x - scale.x * size.x;
+		t1.y = midpoint.y + scale.y * size.y;
+		t2.x = midpoint.x + scale.x * size.x;
+		t2.y = midpoint.y + scale.y * size.y;
+		break;
+	case EAST:
+		t1.x = midpoint.x - scale.x * size.y;
+		t1.y = midpoint.y - scale.y * size.x;
+		t2.x = midpoint.x - scale.x * size.y;
+		t2.y = midpoint.y + scale.y * size.x;
+		break;
+	case SOUTH:
+		t1.x = midpoint.x + scale.x * size.x;
+		t1.y = midpoint.y - scale.y * size.y;
+		t2.x = midpoint.x - scale.x * size.x;
+		t2.y = midpoint.y - scale.y * size.y;
+		break;
+	case WEST:
+		t1.x = midpoint.x + scale.x * size.y;
+		t1.y = midpoint.y + scale.y * size.x;
+		t2.x = midpoint.x + scale.x * size.y;
+		t2.y = midpoint.y - scale.y * size.x;
+		break;
+	default: ASSERT(0); return;
+	}
+	DrawTriangle(midpoint.rv, t1.rv, t2.rv, colour);
+
+	#if 0
+	DrawCircleV(midpoint.rv, 6, RED);
+	DrawCircleV(t1.rv, 6, BLUE);
+	DrawCircleV(t2.rv, 6, GREEN);
+	#endif
+}
+
+static void
 fill_hsv_texture(RenderTexture texture, v4 hsv)
 {
 	f32 line_length = (f32)texture.texture.height / 3;
@@ -176,7 +217,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 	}
 
 	if (IsMouseButtonUp(MOUSE_BUTTON_LEFT))
-		ctx->held_idx= -1;
+		ctx->held_idx = -1;
 
 	f32 current = ctx->colour.E[label_idx];
 	Rect srl = cut_rect_left(sr, current);
@@ -211,8 +252,8 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		}
 	}
 
-	DrawRectangleRoundedLinesEx(sr.rr, 1, 0, 12, ctx->bg);
-	DrawRectangleRoundedLinesEx(sr.rr, 1, 0, 3, Fade(BLACK, 0.8));
+	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 12, ctx->bg);
+	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
 
 	{
 		/* TODO: move this to ctx */
@@ -226,26 +267,11 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		scale     = move_towards_f32(scale, should_scale? scale_target : 1.0, scale_delta);
 		slider_scale[label_idx] = scale;
 
-		f32 half_tri_w = 8;
-		f32 tri_h = 12;
-		v2 t_mid = {
-			.x = sr.pos.x + current * sr.size.w,
-			.y = sr.pos.y,
-		};
-		v2 t_left = {
-			.x = (t_mid.x - scale * half_tri_w),
-			.y = (t_mid.y - scale * tri_h),
-		};
-		v2 t_right = {
-			.x = (t_mid.x + scale * half_tri_w),
-			.y = (t_mid.y - scale * tri_h),
-		};
-		DrawTriangle(t_right.rv, t_left.rv, t_mid.rv, ctx->fg);
-
-		t_mid.y   += sr.size.h;
-		t_left.y  += sr.size.h + 2 * tri_h * scale;
-		t_right.y += sr.size.h + 2 * tri_h * scale;
-		DrawTriangle(t_mid.rv, t_left.rv, t_right.rv, ctx->fg);
+		v2 tri_scale = {.x = scale, .y = scale};
+		v2 tri_mid   = {.x = sr.pos.x + current * sr.size.w, .y = sr.pos.y};
+		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, SOUTH, ctx->fg);
+		tri_mid.y   += sr.size.h;
+		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, NORTH, ctx->fg);
 	}
 
 	const char *value = TextFormat("%0.02f", current);
@@ -450,30 +476,14 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	r.size.w *= 0.8;
 
 	b32 push_collides  = CheckCollisionPointRec(ctx->mouse_pos.rv, r.rr);
-	static f32 y_shift = 0.0;
-	f32 y_target       = -0.2 * r.size.h;
-	f32 y_delta        = -y_target * 8 * ctx->dt;
+	static f32 param   = 0.0;
+	param = move_towards_f32(param, push_collides? 1 : 0, 8 * ctx->dt);
 
-	y_shift = move_towards_f32(y_shift, push_collides? y_target : 0, y_delta);
+	v2 tri_size  = {.x = 0.25 * r.size.w,           .y = 0.5 * r.size.h};
+	v2 tri_scale = {.x = 1 - 0.5 * param,          .y = 1 + 0.3 * param};
+	v2 tri_mid   = {.x = r.pos.x + 0.5 * r.size.w, .y = r.pos.y - 0.3 * r.size.h * param};
+	draw_cardinal_triangle(tri_mid, tri_size, tri_scale, NORTH, ctx->fg);
 
-	v2 center = {
-		.x = r.pos.x + 0.5 * r.size.w,
-		.y = r.pos.y + 0.5 * r.size.h,
-	};
-	v2 t_top  = {
-		.x = center.x,
-		.y = center.y - 0.3 * r.size.h + y_shift,
-	};
-	v2 t_left = {
-		.x = center.x - 0.3 * r.size.w - 0.75 * y_shift,
-		.y = center.y + 0.3 * r.size.h,
-	};
-	v2 t_right = {
-		.x = center.x + 0.3 * r.size.w + 0.75 * y_shift,
-		.y = center.y + 0.3 * r.size.h,
-	};
-
-	DrawTriangle(t_top.rv, t_left.rv, t_right.rv, ctx->fg);
 	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		css->fade_param -= 1e-6;
 		v4 colour  = ctx->colour;
@@ -649,8 +659,8 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 
 	EndShaderMode();
 
-	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 12, ctx->bg);
-	DrawRectangleRoundedLinesEx(r.rr, STACK_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
+	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 12, ctx->bg);
+	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 3, Fade(BLACK, 0.8));
 
 	f32 param = (colour.x - top_colour.x) / (bot_colour.x - top_colour.x);
 	{
@@ -665,23 +675,11 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 		scale     = move_towards_f32(scale, should_scale? scale_target : 1.0, scale_delta);
 		slider_scale[idx] = scale;
 
-		f32 half_tri_w = 12;
-		f32 tri_h = 8;
-		v2 t_mid  = {.x = r.pos.x, .y = r.pos.y + (param * r.size.h)};
-		v2 t_top  = {
-			.x = t_mid.x - scale * half_tri_w,
-			.y = t_mid.y + scale * tri_h,
-		};
-		v2 t_bot  = {
-			.x = t_mid.x - scale * half_tri_w,
-			.y = t_mid.y - scale * tri_h,
-		};
-		DrawTriangle(t_mid.rv, t_bot.rv, t_top.rv, ctx->fg);
-
-		t_mid.x += r.size.w;
-		t_top.x += r.size.w + 2 * half_tri_w * scale;
-		t_bot.x += r.size.w + 2 * half_tri_w * scale;
-		DrawTriangle(t_mid.rv, t_top.rv, t_bot.rv, ctx->fg);
+		v2 tri_scale = {.x = scale, .y = scale};
+		v2 tri_mid   = {.x = r.pos.x, .y = r.pos.y + (param * r.size.h)};
+		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, EAST, ctx->fg);
+		tri_mid.x   += r.size.w;
+		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, WEST, ctx->fg);
 	}
 
 	return colour;
