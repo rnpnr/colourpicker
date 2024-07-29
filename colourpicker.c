@@ -1,6 +1,7 @@
 /* See LICENSE for copyright details */
 #include <raylib.h>
 #include <stdio.h>
+#include <string.h> /* memmove */
 
 #include "util.c"
 
@@ -41,17 +42,6 @@ left_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
 	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
 	v2 delta = { .h = r.size.h - ts.h };
 	return (v2) { .x = r.pos.x, .y = r.pos.y + 0.5 * delta.h, };
-}
-
-static v2
-right_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
-{
-	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
-	v2 delta = { .h = r.size.h - ts.h };
-	return (v2) {
-		.x = r.pos.x + r.size.w - ts.w,
-	        .y = r.pos.y + 0.5 * delta.h,
-	};
 }
 
 static Rect
@@ -239,11 +229,170 @@ static void
 get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 {
 	if (label) *label = cut_rect_left(r, 0.08);
-	if (value) *value = cut_rect_right(r, 0.87);
+	if (value) *value = cut_rect_right(r, 0.83);
 	if (slider) {
-		*slider = cut_rect_middle(r, 0.1, 0.85);
+		*slider = cut_rect_middle(r, 0.1, 0.79);
 		slider->size.h *= 0.7;
 		slider->pos.y  += r.size.h * 0.15;
+	}
+}
+
+static void
+parse_and_store_text_input(ColourPickerCtx *ctx)
+{
+
+	v4   new_colour = {0};
+	enum colour_mode new_mode = CM_LAST;
+	if (ctx->is.idx == INPUT_HEX) {
+		u32 ri, gi, bi, ai;
+		sscanf(ctx->is.buf, "%02x%02x%02x%02x", &ri, &gi, &bi, &ai);
+		new_colour = (v4){.rv = ColorNormalize((Color){.r = ri, .g = gi,
+		                                               .b = bi, .a = ai})};
+		new_mode = CM_RGB;
+	} else {
+		new_mode   = ctx->colour_mode;
+		new_colour = ctx->colour;
+		f32 fv;
+		sscanf(ctx->is.buf, "%f", &fv);
+		CLAMP01(fv);
+		switch(ctx->is.idx) {
+		case INPUT_R: new_colour.r = fv; break;
+		case INPUT_G: new_colour.g = fv; break;
+		case INPUT_B: new_colour.b = fv; break;
+		case INPUT_A: new_colour.a = fv; break;
+		default: break;
+		}
+	}
+
+	if (new_mode != CM_LAST)
+		store_formatted_colour(ctx, new_colour, new_mode);
+}
+
+static void
+set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mouse)
+{
+	if (ctx->is.idx != idx)
+		parse_and_store_text_input(ctx);
+
+	if (idx == INPUT_HEX) {
+		Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+		ctx->is.buf_len = snprintf(ctx->is.buf, ARRAY_COUNT(ctx->is.buf),
+		                           "%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+	} else {
+		f32 fv = 0;
+		switch (idx) {
+		case INPUT_R: fv = ctx->colour.r; break;
+		case INPUT_G: fv = ctx->colour.g; break;
+		case INPUT_B: fv = ctx->colour.b; break;
+		case INPUT_A: fv = ctx->colour.a; break;
+		default: break;
+		}
+		ctx->is.buf_len = snprintf(ctx->is.buf, ARRAY_COUNT(ctx->is.buf), "%0.02f", fv);
+	}
+
+	ctx->is.idx    = idx;
+	ctx->is.cursor = -1;
+	CLAMP(ctx->is.idx, -1, INPUT_A);
+	if (ctx->is.idx == -1)
+		return;
+
+	ASSERT(CheckCollisionPointRec(mouse.rv, r.rr));
+	ctx->is.cursor_p = (mouse.x - r.pos.x) / r.size.w;
+	CLAMP01(ctx->is.cursor_p);
+}
+
+static void
+do_text_input(ColourPickerCtx *ctx, enum input_indices idx, Rect r, Color colour)
+{
+	static i32 max_chars[INPUT_A + 1] = {
+		[INPUT_HEX] = 8,
+		[INPUT_R]   = 4,
+		[INPUT_B]   = 4,
+		[INPUT_G]   = 4,
+		[INPUT_A]   = 4,
+	};
+
+	v2 ts  = {.rv = MeasureTextEx(ctx->font, ctx->is.buf, ctx->font_size, 0)};
+	v2 pos = {.x = r.pos.x, .y = r.pos.y + (r.size.y - ts.y) / 2};
+
+	i32 buf_delta = ctx->is.buf_len - max_chars[idx];
+	if (buf_delta < 0) buf_delta = 0;
+	char *buf     = ctx->is.buf + buf_delta;
+	DrawTextEx(ctx->font, buf, pos.rv, ctx->font_size, 0, colour);
+
+	if (idx != ctx->is.idx)
+		return;
+
+	ctx->is.cursor_t = move_towards_f32(ctx->is.cursor_t, ctx->is.cursor_t_target,
+	                                    1.5 * ctx->dt);
+	if (ctx->is.cursor_t == ctx->is.cursor_t_target) {
+		if (ctx->is.cursor_t_target == 0) ctx->is.cursor_t_target = 1;
+		else                              ctx->is.cursor_t_target = 0;
+	}
+
+	v4 bg = ctx->hover_colour;
+	bg.a  = 0;
+	Color cursor_colour = colour_from_normalized(lerp_v4(bg, ctx->hover_colour,
+	                                                     ctx->is.cursor_t));
+
+	/* NOTE: guess a cursor position */
+	if (ctx->is.cursor == -1) {
+		f32 narrow_char_scale = 1.1;
+		if (ctx->is.idx != INPUT_HEX) narrow_char_scale = 1.45;
+		ctx->is.cursor = ctx->is.cursor_p * ctx->is.buf_len * narrow_char_scale;
+		CLAMP(ctx->is.cursor, 0, ctx->is.buf_len);
+	}
+
+	/* NOTE: Braindead NULL termination stupidity */
+	char saved_c = buf[ctx->is.cursor - buf_delta];
+	buf[ctx->is.cursor - buf_delta] = 0;
+
+	v2 sts           = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
+	f32 cursor_x     = r.pos.x + sts.x;
+	f32 cursor_width = ctx->is.cursor == ctx->is.buf_len ? 20 : 6;
+
+	buf[ctx->is.cursor - buf_delta] = saved_c;
+
+	Rect cursor_r = {
+		.pos  = {.x = cursor_x,     .y = pos.y},
+		.size = {.w = cursor_width, .h = ts.h},
+	};
+
+	DrawRectangleRec(cursor_r.rr, cursor_colour);
+
+	/* NOTE: handle multiple input keys on a single frame */
+	i32 key = GetCharPressed();
+	while (key > 0) {
+		if (ctx->is.buf_len == (ARRAY_COUNT(ctx->is.buf) - 1)) {
+			ctx->is.buf[ARRAY_COUNT(ctx->is.buf) - 1] = 0;
+			break;
+		}
+
+		/* TODO: remove memmove */
+		memmove(ctx->is.buf + ctx->is.cursor + 1,
+		        ctx->is.buf + ctx->is.cursor,
+		        ctx->is.buf_len - ctx->is.cursor + 1);
+
+		ctx->is.buf[ctx->is.cursor++] = key;
+		ctx->is.buf_len++;
+		key = GetCharPressed();
+	}
+
+	if ((IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT)) && ctx->is.cursor > 0)
+		ctx->is.cursor--;
+
+	if ((IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT)) &&
+	    ctx->is.cursor < ctx->is.buf_len)
+		ctx->is.cursor++;
+
+	if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) &&
+	    ctx->is.cursor > 0) {
+		/* TODO: remove memmove */
+		ctx->is.cursor--;
+		memmove(ctx->is.buf + ctx->is.cursor,
+		        ctx->is.buf + ctx->is.cursor + 1,
+			ctx->is.buf_len - ctx->is.cursor - 1);
+		ctx->is.buf[--ctx->is.buf_len] = 0;
 	}
 }
 
@@ -318,16 +467,13 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 	                            SLIDER_BORDER_COLOUR);
 
 	{
-		/* TODO: move this to ctx */
-		static f32 slider_scale[4] = { 1, 1, 1, 1 };
-		f32 scale_target = 1.5;
-		f32 scale_delta  = (scale_target - 1.0) * 8 * ctx->dt;
-
+		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0) * SLIDER_SCALE_SPEED * ctx->dt;
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && label_idx == ctx->held_idx);
-		f32 scale = slider_scale[label_idx];
-		scale     = move_towards_f32(scale, should_scale? scale_target : 1.0, scale_delta);
-		slider_scale[label_idx] = scale;
+		f32 scale = ctx->ss.scale_t[label_idx];
+		scale     = move_towards_f32(scale, should_scale? SLIDER_SCALE_TARGET: 1.0,
+		                             scale_delta);
+		ctx->ss.scale_t[label_idx] = scale;
 
 		v2 tri_scale = {.x = scale, .y = scale};
 		v2 tri_mid   = {.x = sr.pos.x + current * sr.size.w, .y = sr.pos.y};
@@ -336,18 +482,56 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, NORTH, ctx->fg);
 	}
 
-	const char *value = TextFormat("%0.02f", current);
-	fpos = right_align_text_in_rect(vr, value, ctx->font, ctx->font_size);
-	DrawTextEx(ctx->font, value, fpos.rv, ctx->font_size, 0, ctx->fg);
+	{
+		SliderState *s = &ctx->ss;
+		b32 collides = CheckCollisionPointRec(test_pos.rv, vr.rr);
+		if (collides && ctx->is.idx != (label_idx + 1)) {
+			s->colour_t[label_idx] += TEXT_HOVER_SPEED * ctx->dt;
+		} else {
+			s->colour_t[label_idx] -= TEXT_HOVER_SPEED * ctx->dt;
+		}
+		CLAMP01(s->colour_t[label_idx]);
+
+		if (!collides && ctx->is.idx == (label_idx + 1) &&
+		    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+			set_text_input_idx(ctx, -1, vr, test_pos);
+			current = ctx->colour.E[label_idx];
+		}
+
+		v4 colour       = lerp_v4(normalize_colour(pack_rl_colour(ctx->fg)),
+		                          ctx->hover_colour, s->colour_t[label_idx]);
+		Color colour_rl = colour_from_normalized(colour);
+
+		if (collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+			set_text_input_idx(ctx, label_idx + 1, vr, test_pos);
+
+		if (ctx->is.idx != (label_idx + 1)) {
+			const char *value = TextFormat("%0.02f", current);
+			fpos = left_align_text_in_rect(vr, value, ctx->font, ctx->font_size);
+			DrawTextEx(ctx->font, value, fpos.rv, ctx->font_size, 0, colour_rl);
+		} else {
+			do_text_input(ctx, label_idx + 1, vr, colour_rl);
+		}
+	}
 }
 
 static void
 do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 {
 	Rect hex_r  = cut_rect_left(r, 0.5);
-	Rect mode_r = cut_rect_right(r, 0.85);
-	mode_r.pos.y  += mode_r.size.h * 0.15;
-	mode_r.size.h *= 0.7;
+	Rect mode_r;
+	get_slider_subrects(r, 0, 0, &mode_r);
+
+
+	char *mode_txt;
+	switch (ctx->colour_mode) {
+	case CM_RGB:  mode_txt = "RGB"; break;
+	case CM_HSV:  mode_txt = "HSV"; break;
+	case CM_LAST: ASSERT(0);        break;
+	}
+	v2 mode_ts     = {.rv = MeasureTextEx(ctx->font, mode_txt, ctx->font_size, 0)};
+	mode_r.pos.y  += (mode_r.size.h - mode_ts.h) / 2;
+	mode_r.size.w  = mode_ts.w;
 
 	v2 test_pos  = ctx->mouse_pos;
 	test_pos.x  -= relative_origin.x;
@@ -360,12 +544,31 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 			step_colour_mode(ctx, -1);
 	}
 
+	Color hc          = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+	const char *hex   = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 	const char *label = "RGB: ";
+
 	v2 label_size = {.rv = MeasureTextEx(ctx->font, label, ctx->font_size, 0)};
+	v2 hex_size   = {.rv = MeasureTextEx(ctx->font, hex,   ctx->font_size, 0)};
+
+	f32 extra_input_scale = 1.07;
+	hex_r.size.w = extra_input_scale * (label_size.w + hex_size.w);
+
 	Rect label_r = cut_rect_left(hex_r,  label_size.x / hex_r.size.w);
 	hex_r        = cut_rect_right(hex_r, label_size.x / hex_r.size.w);
 
 	i32 hex_collides = CheckCollisionPointRec(test_pos.rv, hex_r.rr);
+
+	if (!hex_collides && ctx->is.idx == INPUT_HEX &&
+	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+		set_text_input_idx(ctx, -1, hex_r, test_pos);
+		hc  = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+		hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+	}
+
+	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+		set_text_input_idx(ctx, INPUT_HEX, hex_r, test_pos);
+	#if 0
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
 		const char *new = TextToLower(GetClipboardText());
 		u32 r, g, b, a;
@@ -373,23 +576,17 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 		v4 new_colour = {.rv = ColorNormalize((Color){.r = r, .g = g, .b = b, .a = a})};
 		store_formatted_colour(ctx, new_colour, CM_RGB);
 	}
+	#endif
 
-	Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-	const char *hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+	if (hex_collides && ctx->is.idx != INPUT_HEX)
+		ctx->sbs.hex_hover_t += TEXT_HOVER_SPEED * ctx->dt;
+	else
+		ctx->sbs.hex_hover_t -= TEXT_HOVER_SPEED * ctx->dt;
 
-	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-		SetClipboardText(hex);
+	if (mode_collides) ctx->sbs.mode_hover_t += TEXT_HOVER_SPEED * ctx->dt;
+	else               ctx->sbs.mode_hover_t -= TEXT_HOVER_SPEED * ctx->dt;
 
-	f32 scale = -5;
-	if (hex_collides) scale *= -1;
-
-	ctx->sbs.hex_hover_t += scale * ctx->dt;
 	CLAMP01(ctx->sbs.hex_hover_t);
-
-	scale = -5;
-	if (mode_collides) scale *= -1;
-
-	ctx->sbs.mode_hover_t += scale * ctx->dt;
 	CLAMP01(ctx->sbs.mode_hover_t);
 
 	v4 fg          = normalize_colour(pack_rl_colour(ctx->fg));
@@ -399,17 +596,16 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 
-	fpos = left_align_text_in_rect(hex_r, hex, ctx->font, ctx->font_size);
-	DrawTextEx(ctx->font, hex, fpos.rv, ctx->font_size, 0, colour_from_normalized(hex_colour));
-
-	char *mtext;
-	switch (ctx->colour_mode) {
-	case CM_RGB:  mtext = "RGB"; break;
-	case CM_HSV:  mtext = "HSV"; break;
-	case CM_LAST: ASSERT(0);     break;
+	Color hex_colour_rl = colour_from_normalized(hex_colour);
+	if (ctx->is.idx != INPUT_HEX) {
+		fpos = left_align_text_in_rect(hex_r, hex, ctx->font, ctx->font_size);
+		DrawTextEx(ctx->font, hex, fpos.rv, ctx->font_size, 0, hex_colour_rl);
+	} else {
+		do_text_input(ctx, INPUT_HEX, hex_r, hex_colour_rl);
 	}
-	fpos = right_align_text_in_rect(mode_r, mtext, ctx->font, ctx->font_size);
-	DrawTextEx(ctx->font, mtext, fpos.rv, ctx->font_size, 0, colour_from_normalized(mode_colour));
+
+	DrawTextEx(ctx->font, mode_txt, mode_r.pos.rv, ctx->font_size, 0,
+	           colour_from_normalized(mode_colour));
 }
 
 static void
@@ -455,9 +651,13 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 {
 	ColourStackState *css = &ctx->colour_stack;
 
+	/* NOTE: Small adjusment to align with mode text. TODO: Cleanup? */
+	sa.pos.y  += 0.025 * sa.size.h;
+	sa.size.h *= 0.98;
+
 	Rect r    = sa;
 	r.size.h *= 1.0 / (ARRAY_COUNT(css->items) + 3);
-	r.size.w *= 0.5;
+	r.size.w *= 0.75;
 	r.pos.x  += (sa.size.w - r.size.w) * 0.5;
 
 	f32 y_pos_delta = r.size.h + 10;
@@ -507,12 +707,9 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	draw_cardinal_triangle(tri_mid, tri_size, tri_scale, NORTH, ctx->fg);
 
 	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		css->fade_param -= 1e-6;
-		v4 colour  = get_formatted_colour(ctx, CM_RGB);
-
-		css->last = css->items[css->widx];
-		css->items[css->widx++] = colour;
-
+		css->fade_param         -= 1e-6;
+		css->last                = css->items[css->widx];
+		css->items[css->widx++]  = get_formatted_colour(ctx, CM_RGB);
 		if (css->widx == ARRAY_COUNT(css->items))
 			css->widx = 0;
 	}
@@ -529,18 +726,17 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	DrawRectangleRec(cs[1].rr, colour);
 
 	v4 fg     = normalize_colour(pack_rl_colour(ctx->fg));
-	f32 scale = 5;
 	char *labels[2] = {"Revert", "Apply"};
 
 	i32 pressed_idx = -1;
 	for (i32 i = 0; i < ARRAY_COUNT(cs); i++) {
 		if (CheckCollisionPointRec(ctx->mouse_pos.rv, cs[i].rr) && ctx->held_idx == -1) {
-			ctx->selection_hover_t[i] += scale * ctx->dt;
+			ctx->selection_hover_t[i] += TEXT_HOVER_SPEED * ctx->dt;
 
 			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 				pressed_idx = i;
 		} else {
-			ctx->selection_hover_t[i] -= scale * ctx->dt;
+			ctx->selection_hover_t[i] -= TEXT_HOVER_SPEED * ctx->dt;
 		}
 
 		CLAMP01(ctx->selection_hover_t[i]);
@@ -663,13 +859,13 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 	{
 		/* TODO: move this to ctx */
 		static f32 slider_scale[2] = { 1, 1 };
-		f32 scale_target = 1.5;
-		f32 scale_delta  = (scale_target - 1.0) * 8 * ctx->dt;
+		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0f) * SLIDER_SCALE_SPEED * ctx->dt;
 
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && ctx->held_idx == idx);
 		f32 scale = slider_scale[idx];
-		scale     = move_towards_f32(scale, should_scale? scale_target : 1.0, scale_delta);
+		scale     = move_towards_f32(scale, should_scale? SLIDER_SCALE_TARGET : 1.0,
+		                             scale_delta);
 		slider_scale[idx] = scale;
 
 		v2 tri_scale = {.x = scale, .y = scale};
@@ -777,13 +973,11 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 	{
 		/* TODO: move this to ctx */
 		static f32 slider_scale = 1;
-		f32 scale_target = 1.5;
-		f32 scale_delta  = (scale_target - 1.0) * 8 * ctx->dt;
-
+		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0) * SLIDER_SCALE_SPEED * ctx->dt;
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && ctx->held_idx == PM_RIGHT);
-		slider_scale = move_towards_f32(slider_scale, should_scale? scale_target : 1.0,
-		                                scale_delta);
+		slider_scale = move_towards_f32(slider_scale, should_scale?
+		                                SLIDER_SCALE_TARGET : 1.0, scale_delta);
 
 		/* NOTE: North-East */
 		f32 line_len = 8;
@@ -850,8 +1044,8 @@ do_colour_picker(ColourPickerCtx *ctx)
 		.size = {.w = ws.w - 2 * pad.x, .h = ws.h * 0.4 - 1 * pad.y},
 	};
 
-	Rect ma = cut_rect_left(upper, 0.8);
-	Rect sa = cut_rect_right(upper, 0.8);
+	Rect ma = cut_rect_left(upper, 0.84);
+	Rect sa = cut_rect_right(upper, 0.84);
 	do_colour_stack(ctx, sa);
 
 	{

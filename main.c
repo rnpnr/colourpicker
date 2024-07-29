@@ -111,7 +111,7 @@ int
 main(i32 argc, char *argv[])
 {
 	ColourPickerCtx ctx = {
-		.window_size = { .w = 720, .h = 860 },
+		.window_size = { .w = 640, .h = 860 },
 
 		.mode        = CPM_PICKER,
 		.colour_mode = CM_HSV,
@@ -119,7 +119,9 @@ main(i32 argc, char *argv[])
 
 		.colour   = {.r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0},
 
+		.is  = {.idx = -1, .cursor_t = 1, .cursor_t_target = 0},
 		.mcs = {.mode_visible_t = 1, .next_mode = -1},
+		.ss  = {.scale_t = {1, 1, 1, 1}},
 
 		.bg = { .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff },
 		.fg = { .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff },

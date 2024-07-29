@@ -63,20 +63,32 @@ enum colour_picker_flags {
 	CPF_REFILL_TEXTURE = 1 << 0,
 };
 
+enum input_indices {
+	INPUT_HEX,
+	INPUT_R,
+	INPUT_G,
+	INPUT_B,
+	INPUT_A
+};
+
 enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
-#define SLIDER_BORDER_WIDTH    3.0f
 #define SLIDER_BORDER_COLOUR   (Color){.r = 0x00, .g = 0x00, .b = 0x00, .a = 0xCC}
+#define SLIDER_BORDER_WIDTH    3.0f
 #define SLIDER_ROUNDNESS       0.5f
+#define SLIDER_SCALE_SPEED     8.0f
+#define SLIDER_SCALE_TARGET    1.5f
 #define SLIDER_TRI_SIZE        (v2){.x = 6, .y = 8}
 
-#define STACK_BORDER_WIDTH     SLIDER_BORDER_WIDTH
 #define STACK_BORDER_COLOUR    SLIDER_BORDER_COLOUR
+#define STACK_BORDER_WIDTH     SLIDER_BORDER_WIDTH
 #define STACK_ROUNDNESS        0.3f
 
-#define SELECTOR_BORDER_WIDTH  SLIDER_BORDER_WIDTH
 #define SELECTOR_BORDER_COLOUR SLIDER_BORDER_COLOUR
+#define SELECTOR_BORDER_WIDTH  SLIDER_BORDER_WIDTH
 #define SELECTOR_ROUNDNESS     0.3f
+
+#define TEXT_HOVER_SPEED       5.0f
 
 #define COLOUR_STACK_ITEMS 8
 typedef struct {
@@ -87,6 +99,11 @@ typedef struct {
 	f32 fade_param;
 	f32 yoff;
 } ColourStackState;
+
+typedef struct {
+	f32 scale_t[4];
+	f32 colour_t[4];
+} SliderState;
 
 typedef struct {
 	f32 hex_hover_t;
@@ -105,6 +122,16 @@ typedef struct {
 } PickerModeState;
 
 typedef struct {
+	i32  idx;
+	i32  cursor;
+	f32  cursor_p;
+	f32  cursor_t;
+	f32  cursor_t_target;
+	i32  buf_len;
+	char buf[64];
+} InputState;
+
+typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
@@ -113,9 +140,11 @@ typedef struct {
 	uv2 window_size;
 	Color bg, fg;
 
-	StatusBarState  sbs;
+	InputState      is;
 	ModeChangeState mcs;
 	PickerModeState pms;
+	SliderState     ss;
+	StatusBarState  sbs;
 
 	i32 held_idx;
 
