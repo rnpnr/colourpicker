@@ -280,4 +280,28 @@ pack_rl_colour(Color colour)
 	return colour.r << 24 | colour.g << 16 | colour.b << 8 | colour.a << 0;
 }
 
+static u32
+parse_hex_u32(char *s)
+{
+	u32 res = 0;
+
+	/* NOTE: skip over '0x' or '0X' */
+	if (*s == '0' && (*(s + 1) == 'x' || *(s + 1) == 'X'))
+		s += 2;
+
+	for (; *s; s++) {
+		res <<= 4;
+		if (ISDIGIT(*s)) {
+			res |= *s - '0';
+		} else if (ISHEX(*s)) {
+			/* NOTE: convert to lowercase first then convert to value */
+			*s  |= 0x20;
+			res |= *s - 0x57;
+		} else {
+			/* NOTE: do nothing (treat invalid value as 0) */
+		}
+	}
+	return res;
+}
+
 #endif /* _UTIL_C_ */

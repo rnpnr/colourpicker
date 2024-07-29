@@ -83,30 +83,6 @@ parse_f32(char *s)
 	return CLAMP01(res);
 }
 
-static u32
-parse_u32(char *s)
-{
-	u32 res = 0;
-
-	/* NOTE: skip over '0x' or '0X' */
-	if (*s == '0' && (*(s + 1) == 'x' || *(s + 1) == 'X'))
-		s += 2;
-
-	for (; *s; s++) {
-		res <<= 4;
-		if (ISDIGIT(*s)) {
-			res |= *s - '0';
-		} else if (ISHEX(*s)) {
-			/* NOTE: convert to lowercase first then convert to value */
-			*s  |= 0x20;
-			res |= *s - 0x57;
-		} else {
-			/* NOTE: do nothing (treat invalid value as 0) */
-		}
-	}
-	return res;
-}
-
 int
 main(i32 argc, char *argv[])
 {
@@ -157,7 +133,7 @@ main(i32 argc, char *argv[])
 
 				switch (argv[i][1]) {
 				case 'h':
-					rgb = normalize_colour(parse_u32(argv[i + 1]));
+					rgb = normalize_colour(parse_hex_u32(argv[i + 1]));
 					ctx.colour = rgb_to_hsv(rgb);
 					break;
 				case 'r': rgb.r = parse_f32(argv[i + 1]); break;

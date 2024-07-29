@@ -244,11 +244,8 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 	v4   new_colour = {0};
 	enum colour_mode new_mode = CM_LAST;
 	if (ctx->is.idx == INPUT_HEX) {
-		u32 ri, gi, bi, ai;
-		sscanf(ctx->is.buf, "%02x%02x%02x%02x", &ri, &gi, &bi, &ai);
-		new_colour = (v4){.rv = ColorNormalize((Color){.r = ri, .g = gi,
-		                                               .b = bi, .a = ai})};
-		new_mode = CM_RGB;
+		new_colour = normalize_colour(parse_hex_u32(ctx->is.buf));
+		new_mode   = CM_RGB;
 	} else {
 		new_mode   = ctx->colour_mode;
 		new_colour = ctx->colour;
@@ -522,7 +519,6 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 	Rect mode_r;
 	get_slider_subrects(r, 0, 0, &mode_r);
 
-
 	char *mode_txt;
 	switch (ctx->colour_mode) {
 	case CM_RGB:  mode_txt = "RGB"; break;
@@ -701,7 +697,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	static f32 param   = 0.0;
 	param = move_towards_f32(param, push_collides? 1 : 0, 8 * ctx->dt);
 
-	v2 tri_size  = {.x = 0.25 * r.size.w,           .y = 0.5 * r.size.h};
+	v2 tri_size  = {.x = 0.25 * r.size.w,          .y = 0.5 * r.size.h};
 	v2 tri_scale = {.x = 1 - 0.5 * param,          .y = 1 + 0.3 * param};
 	v2 tri_mid   = {.x = r.pos.x + 0.5 * r.size.w, .y = r.pos.y - 0.3 * r.size.h * param};
 	draw_cardinal_triangle(tri_mid, tri_size, tri_scale, NORTH, ctx->fg);
