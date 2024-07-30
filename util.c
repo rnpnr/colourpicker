@@ -205,19 +205,18 @@ rgb_to_hsv(v4 rgb)
 	_Alignas(16) f32 scale[4] = {1.0/6.0f, 0, 0, 0};
 	/* NOTE if C == 0 then take H as 0/1 (which are equivalent in HSV) */
 	__m128 t    = _mm_div_ps(_mm_sub_ps(gbra, brga), C);
-	t           = _mm_blendv_ps(t, zero, _mm_cmpeq_ps(zero, C));
+	t           = _mm_and_ps(t, _mm_cmpneq_ps(zero, C));
 	t           = _mm_add_ps(t, _mm_load_ps(aval));
 	/* TODO: does (G - B) / C ever exceed 6.0? */
 	/* NOTE: Compute fmodf on element [0] */
 	t           = _mm_sub_ps(t, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(t, _mm_load_ps(scale))), six));
 
-	__m128 H = _mm_div_ps(_mm_blendv_ps(zero, t, _mm_cmpeq_ps(rgba, Max)), six);
+	__m128 H = _mm_div_ps(_mm_and_ps(t, _mm_cmpeq_ps(rgba, Max)), six);
 	__m128 S = _mm_div_ps(C, Max);
 
 	/* NOTE: Make sure H & S are 0 instead of NaN when V == 0 */
-	__m128 zeromask = _mm_cmpeq_ps(zero, Max);
-	H = _mm_blendv_ps(H, zero, zeromask);
-	S = _mm_blendv_ps(S, zero, zeromask);
+	H = _mm_and_ps(H, _mm_cmpneq_ps(zero, Max));
+	S = _mm_and_ps(S, _mm_cmpneq_ps(zero, Max));
 
 	__m128 H0 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 0, 0, 0));
 	__m128 H1 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 1, 1, 1));
