@@ -198,23 +198,20 @@ rgb_to_hsv(v4 rgb)
 	__m128 Min  = _mm_min_ps(rgba, _mm_min_ps(gbra, brga));
 	__m128 C    = _mm_sub_ps(Max, Min);
 
-	__m128 t = _mm_div_ps(_mm_sub_ps(gbra, brga), C);
+	__m128 zero = _mm_set1_ps(0);
+	__m128 six  = _mm_set1_ps(6);
 
-	_Alignas(16) f32 aval[4] = { 0, 2, 4, 0 };
-	t = _mm_add_ps(t, _mm_load_ps(aval));
-
+	_Alignas(16) f32 aval[4]  = {0, 2, 4, 0};
+	_Alignas(16) f32 scale[4] = {1.0/6.0f, 0, 0, 0};
+	/* NOTE if C == 0 then take H as 0/1 (which are equivalent in HSV) */
+	__m128 t    = _mm_div_ps(_mm_sub_ps(gbra, brga), C);
+	t           = _mm_blendv_ps(t, zero, _mm_cmpeq_ps(zero, C));
+	t           = _mm_add_ps(t, _mm_load_ps(aval));
 	/* TODO: does (G - B) / C ever exceed 6.0? */
-	/* NOTE: 1e9 ensures that the remainder after floor is 0.
-	 * This limits the fmodf to apply only to element [0] */
-	_Alignas(16) f32 div[4] = { 6, 1e9, 1e9, 1e9 };
-	__m128 six = _mm_set1_ps(6);
-	__m128 rem = _mm_floor_ps(_mm_div_ps(t, _mm_load_ps(div)));
-	t = _mm_sub_ps(t, _mm_mul_ps(rem, six));
+	/* NOTE: Compute fmodf on element [0] */
+	t           = _mm_sub_ps(t, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(t, _mm_load_ps(scale))), six));
 
-	__m128 zero    = _mm_set1_ps(0);
-	__m128 maxmask = _mm_cmpeq_ps(rgba, Max);
-
-	__m128 H = _mm_div_ps(_mm_blendv_ps(zero, t, maxmask), six);
+	__m128 H = _mm_div_ps(_mm_blendv_ps(zero, t, _mm_cmpeq_ps(rgba, Max)), six);
 	__m128 S = _mm_div_ps(C, Max);
 
 	/* NOTE: Make sure H & S are 0 instead of NaN when V == 0 */
@@ -228,9 +225,15 @@ rgb_to_hsv(v4 rgb)
 	H         = _mm_or_ps(H0, _mm_or_ps(H1, H2));
 
 	/* NOTE: keep only element [0] from H vector; Max contains V & A */
-	__m128 hva = _mm_blend_ps(Max, H, 0x01);
+	__m128 hva  = _mm_blend_ps(Max, H, 0x01);
+	__m128 hsva = _mm_blend_ps(hva, S, 0x02);
+
+	/* NOTE: Clamp values to 1 */
+	__m128 one = _mm_set1_ps(1);
+	hsva       = _mm_blendv_ps(hsva, one, _mm_cmplt_ps(one, hsva));
+
 	v4 res;
-	_mm_storeu_ps(res.E, _mm_blend_ps(hva, S, 0x02));
+	_mm_storeu_ps(res.E, hsva);
 	return res;
 }
 
