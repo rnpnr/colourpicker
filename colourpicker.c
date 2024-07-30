@@ -561,15 +561,6 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 		set_text_input_idx(ctx, INPUT_HEX, hex_r, test_pos);
-	#if 0
-	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-		const char *new = TextToLower(GetClipboardText());
-		u32 r, g, b, a;
-		sscanf(new, "%02x%02x%02x%02x", &r, &g, &b, &a);
-		v4 new_colour = {.rv = ColorNormalize((Color){.r = r, .g = g, .b = b, .a = a})};
-		store_formatted_colour(ctx, new_colour, CM_RGB);
-	}
-	#endif
 
 	if (hex_collides && ctx->is.idx != INPUT_HEX)
 		ctx->sbs.hex_hover_t += TEXT_HOVER_SPEED * ctx->dt;
@@ -1102,7 +1093,7 @@ do_colour_picker(ColourPickerCtx *ctx)
 
 		mb.pos.y  += lower.size.h * 0.75 / 2;
 
-		f32 offset = lower.size.w - CPM_LAST * (mb.size.w + 0.5 * mode_x_pad);
+		f32 offset = lower.size.w - (CPM_LAST + 1) * (mb.size.w + 0.5 * mode_x_pad);
 		mb.pos.x  += 0.5 * offset;
 
 		Rect tr = {
@@ -1163,6 +1154,62 @@ do_colour_picker(ColourPickerCtx *ctx)
 
 			mb.pos.x      += mb.size.w + mode_x_pad;
 			txt_out.pos.x += mb.size.w + mode_x_pad;
+		}
+
+		static char *button_text[2] = {"Copy", "Paste"};
+		static f32 button_colour_t[2];
+		v4 fg         = normalize_colour(pack_rl_colour(ctx->fg));
+		Color bg      = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+		Rect btn_r    = mb;
+		btn_r.size.h *= 0.46;
+
+		for (u32 i = 0; i < 2; i++) {
+			if (CheckCollisionPointRec(ctx->mouse_pos.rv, btn_r.rr)) {
+				if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+					char *txt;
+					v4 new_colour;
+					switch (i) {
+					case 0:
+						txt = (char *)TextFormat("%02x%02x%02x%02x",
+						                         bg.r, bg.g, bg.b, bg.a);
+						SetClipboardText(txt);
+						break;
+					case 1:
+						txt        = (char *)GetClipboardText();
+						new_colour = normalize_colour(parse_hex_u32(txt));
+						store_formatted_colour(ctx, new_colour, CM_RGB);
+						if (ctx->mode == CPM_PICKER) {
+							f32 hue = rgb_to_hsv(new_colour).x;
+							ctx->pms.base_hue       = hue;
+							ctx->pms.fractional_hue = 0;
+						}
+						break;
+					default:
+						ASSERT(0);
+						break;
+					}
+				}
+				button_colour_t[i] += TEXT_HOVER_SPEED * ctx->dt;
+			} else {
+				button_colour_t[i] -= TEXT_HOVER_SPEED * ctx->dt;
+			}
+			CLAMP01(button_colour_t[i]);
+
+			v2 tpos = center_align_text_in_rect(btn_r, button_text[i], ctx->font,
+			                                    ctx->font_size);
+			v2 spos = {.x = tpos.x + 1.75, .y = tpos.y + 2};
+
+			v4 colour = lerp_v4(fg, ctx->hover_colour, button_colour_t[i]);
+
+			DrawRectangleRounded(btn_r.rr, SELECTOR_ROUNDNESS, 0, bg);
+			DrawRectangleRoundedLinesEx(btn_r.rr, SELECTOR_ROUNDNESS, 0,
+			                            SELECTOR_BORDER_WIDTH, SELECTOR_BORDER_COLOUR);
+			DrawTextEx(ctx->font, button_text[i], spos.rv, ctx->font_size, 0,
+			           Fade(BLACK, 0.8));
+			DrawTextEx(ctx->font, button_text[i], tpos.rv, ctx->font_size, 0,
+			           colour_from_normalized(colour));
+
+			btn_r.pos.y += 0.54 * mb.size.h;
 		}
 	}
 }
