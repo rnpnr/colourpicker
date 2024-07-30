@@ -388,6 +388,11 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 			ctx->is.buf_len - ctx->is.cursor - 1);
 		ctx->is.buf[--ctx->is.buf_len] = 0;
 	}
+
+	if (IsKeyPressed(KEY_ENTER)) {
+		parse_and_store_text_input(ctx);
+		ctx->is.idx = -1;
+	}
 }
 
 static void
