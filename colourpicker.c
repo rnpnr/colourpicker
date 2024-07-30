@@ -249,8 +249,7 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 	} else {
 		new_mode   = ctx->colour_mode;
 		new_colour = ctx->colour;
-		f32 fv;
-		sscanf(ctx->is.buf, "%f", &fv);
+		f32 fv = parse_f32(ctx->is.buf);
 		CLAMP01(fv);
 		switch(ctx->is.idx) {
 		case INPUT_R: new_colour.r = fv; break;

@@ -76,13 +76,6 @@ usage(char *argv0)
 	exit(1);
 }
 
-static f32
-parse_f32(char *s)
-{
-	f32 res = atof(s);
-	return CLAMP01(res);
-}
-
 int
 main(i32 argc, char *argv[])
 {
@@ -136,11 +129,11 @@ main(i32 argc, char *argv[])
 					rgb = normalize_colour(parse_hex_u32(argv[i + 1]));
 					ctx.colour = rgb_to_hsv(rgb);
 					break;
-				case 'r': rgb.r = parse_f32(argv[i + 1]); break;
-				case 'g': rgb.g = parse_f32(argv[i + 1]); break;
-				case 'b': rgb.b = parse_f32(argv[i + 1]); break;
-				case 'a': rgb.a = parse_f32(argv[i + 1]); break;
-				default:  usage(argv[0]);                 break;
+				case 'r': rgb.r = parse_f32(argv[i + 1]); CLAMP01(rgb.r); break;
+				case 'g': rgb.g = parse_f32(argv[i + 1]); CLAMP01(rgb.g); break;
+				case 'b': rgb.b = parse_f32(argv[i + 1]); CLAMP01(rgb.b); break;
+				case 'a': rgb.a = parse_f32(argv[i + 1]); CLAMP01(rgb.a); break;
+				default:  usage(argv[0]);                                 break;
 				}
 				i++;
 			} else {

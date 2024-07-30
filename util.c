@@ -307,4 +307,10 @@ parse_hex_u32(char *s)
 	return res;
 }
 
+static f32
+parse_f32(char *s)
+{
+	return atof(s);
+}
+
 #endif /* _UTIL_C_ */
