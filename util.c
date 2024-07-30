@@ -226,10 +226,7 @@ rgb_to_hsv(v4 rgb)
 	/* NOTE: keep only element [0] from H vector; Max contains V & A */
 	__m128 hva  = _mm_blend_ps(Max, H, 0x01);
 	__m128 hsva = _mm_blend_ps(hva, S, 0x02);
-
-	/* NOTE: Clamp values to 1 */
-	__m128 one = _mm_set1_ps(1);
-	hsva       = _mm_blendv_ps(hsva, one, _mm_cmplt_ps(one, hsva));
+	hsva        = _mm_min_ps(hsva, _mm_set1_ps(1));
 
 	v4 res;
 	_mm_storeu_ps(res.E, hsva);
