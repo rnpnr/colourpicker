@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cflags="-march=native -O3 -Wall"
+cflags="-march=native -std=c11 -O3 -Wall"
 ldflags="-lraylib"
 debug=${DEBUG}
 
@@ -28,6 +28,8 @@ fi
 if [ "$debug" ]; then
 	# Hot Reloading/Debugging
 	cflags="$cflags -O0 -ggdb -D_DEBUG"
+	# NOTE: needed for sync(3p)
+	cflags="$cflags -D_XOPEN_SOURCE=600"
 
 	libcflags="$cflags -fPIC"
 	libldflags="$ldflags -shared"

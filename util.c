@@ -7,6 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef asm
+#define asm __asm__
+#endif
+
 #ifdef _DEBUG
 #define ASSERT(c) do { if (!(c)) asm("int3; nop"); } while (0);
 #define DEBUG_EXPORT
