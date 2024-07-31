@@ -1,7 +1,7 @@
 #!/bin/sh
 
 cflags="-march=native -std=c11 -O3 -Wall"
-ldflags="-lraylib"
+ldflags="-lraylib -lm"
 debug=${DEBUG}
 
 cc=${CC:-cc}
@@ -16,12 +16,12 @@ else
 		git submodule update --init --depth=1 external/raylib
 		cmake --install-prefix="${PWD}/external" \
 		      -G "Ninja" -B external/raylib/build -S external/raylib \
-		      -D CMAKE_INSTALL_LIBDIR=lib \
+		      -D CMAKE_INSTALL_LIBDIR=lib -D CMAKE_BUILD_TYPE="Release" \
 		      -D CUSTOMIZE_BUILD=ON -D WITH_PIC=ON -D BUILD_EXAMPLES=OFF
 		cmake --build   external/raylib/build
 		cmake --install external/raylib/build
 	fi
-	cflags="$cflags -I./external/raylib/include"
+	cflags="$cflags -I./external/include"
 	ldflags="-L./external/lib $ldflags"
 fi
 
