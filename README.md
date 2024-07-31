@@ -4,8 +4,8 @@ A basic colour picker written in C and [raylib][].
 
 ## Requirements
 * C11 Compiler
-* [raylib][] - Optional, a static version will be be build if
-  `USE_SYSTEM_RAYLIB` is not set in the environment.
+* [raylib][] - Optional, a static version will be built if `USE_SYSTEM_RAYLIB`
+  is not set in the environment.
 
 ## Installation
 
