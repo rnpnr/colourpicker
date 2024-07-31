@@ -1,0 +1,4 @@
+colourpicker
+*.so
+external/lib
+external/include

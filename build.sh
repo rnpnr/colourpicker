@@ -1,13 +1,38 @@
 #!/bin/sh
 
-cflags="-march=native -ggdb -O3 -Wall"
+cflags="-march=native -O3 -Wall"
 ldflags="-lraylib"
+debug=${DEBUG}
 
-# Hot Reloading/Debugging
-#cflags="$cflags -D_DEBUG"
+cc=${CC:-cc}
+system_raylib=${USE_SYSTEM_RAYLIB:-$debug}
 
-libcflags="$cflags -fPIC -flto"
-libldflags="$ldflags -shared"
+# NOTE: clones and builds a static raylib if system lib is not requested
+# NOTE: this requires cmake
+if [ "$system_raylib" ]; then
+	ldflags="-L/usr/local/lib $ldflags"
+else
+	if  [ ! -f external/lib/libraylib.a ]; then
+		git submodule update --init --depth=1 external/raylib
+		cmake --install-prefix="${PWD}/external" \
+		      -G "Ninja" -B external/raylib/build -S external/raylib \
+		      -D CMAKE_INSTALL_LIBDIR=lib \
+		      -D CUSTOMIZE_BUILD=ON -D WITH_PIC=ON -D BUILD_EXAMPLES=OFF
+		cmake --build   external/raylib/build
+		cmake --install external/raylib/build
+	fi
+	cflags="$cflags -I./external/raylib/include"
+	ldflags="-L./external/lib $ldflags"
+fi
 
-cc $libcflags colourpicker.c -o libcolourpicker.so $libldflags
-cc $cflags -o colourpicker main.c $ldflags
+if [ "$debug" ]; then
+	# Hot Reloading/Debugging
+	cflags="$cflags -O0 -ggdb -D_DEBUG"
+
+	libcflags="$cflags -fPIC"
+	libldflags="$ldflags -shared"
+
+	${cc} $libcflags colourpicker.c -o libcolourpicker.so $libldflags
+fi
+
+${cc} $cflags -o colourpicker main.c $ldflags
