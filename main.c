@@ -1,15 +1,16 @@
 /* See LICENSE for copyright details */
-#include <dlfcn.h>
-#include <fcntl.h>
 #include <raylib.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include "util.c"
 
 #ifdef _DEBUG
+#include <dlfcn.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 typedef struct timespec Filetime;
 
 static const char *libname = "./libcolourpicker.so";
