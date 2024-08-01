@@ -870,8 +870,11 @@ static void
 do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 {
 	if (!IsShaderReady(ctx->picker_shader)) {
-		/* TODO: LoadShaderFromMemory */
-		ctx->picker_shader = LoadShader(0, "./picker_shader.glsl");
+#ifdef _DEBUG
+		ctx->picker_shader = LoadShader(0, HSV_LERP_SHADER_NAME);
+#else
+		ctx->picker_shader = LoadShaderFromMemory(0, g_hsv_shader_text);
+#endif
 		ctx->mode_id       = GetShaderLocation(ctx->picker_shader, "u_mode");
 		ctx->hsv_id        = GetShaderLocation(ctx->picker_shader, "u_hsv");
 		ctx->size_id       = GetShaderLocation(ctx->picker_shader, "u_size");

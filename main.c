@@ -153,8 +153,8 @@ main(i32 argc, char *argv[])
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 
-	ctx.font_size = 40;
-	ctx.font      = LoadFontEx("assets/Lora-SemiBold.ttf", ctx.font_size, 0, 0);
+	ctx.font_size = FONT_SIZE;
+	ctx.font      = LoadFont_FontInc();
 
 	while(!WindowShouldClose()) {
 		do_debug();

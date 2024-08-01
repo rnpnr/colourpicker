@@ -29,6 +29,8 @@ else
 	ldflags="-L./external/lib $ldflags"
 fi
 
+[ ! -s "config.h" ] && cp config.def.h config.h
+
 if [ "$debug" ]; then
 	# Hot Reloading/Debugging
 	cflags="$cflags -O0 -ggdb -D_DEBUG"
@@ -39,6 +41,11 @@ if [ "$debug" ]; then
 	libldflags="$ldflags -shared"
 
 	${cc} $libcflags colourpicker.c -o libcolourpicker.so $libldflags
+fi
+
+if [ "hsv_lerp.glsl" -nt "shader_inc.h" ]; then
+	${cc} $cflags -D_XOPEN_SOURCE=600 -o gen_incs gen_incs.c -s $ldflags
+	./gen_incs
 fi
 
 ${cc} $cflags -o colourpicker main.c $ldflags

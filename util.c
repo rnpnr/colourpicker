@@ -7,6 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "shader_inc.h"
+#include "font_inc.h"
+#include "config.h"
+
 #ifndef asm
 #define asm __asm__
 #endif
