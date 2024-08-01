@@ -143,9 +143,12 @@ typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
+	uv2 window_size;
+	v2  window_pos;
+	v2  mouse_pos;
+
 	Font font;
 	i32  font_size;
-	uv2 window_size;
 	Color bg, fg;
 
 	InputState      is;
@@ -158,8 +161,6 @@ typedef struct {
 
 	f32 selection_hover_t[2];
 	v4  hover_colour;
-
-	v2 mouse_pos;
 
 	f32 dt;
 

@@ -1012,26 +1012,23 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 }
 
 DEBUG_EXPORT void
-do_colour_picker(ColourPickerCtx *ctx)
+do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse_pos)
 {
-	ClearBackground(ctx->bg);
-
-#ifdef _DEBUG
-	DrawFPS(20, 20);
-#endif
-
-	ctx->dt           = GetFrameTime();
-	ctx->mouse_pos.rv = GetMousePosition();
+	ctx->dt            = dt;
+	ctx->mouse_pos.rv  = mouse_pos;
+	ctx->window_pos.rv = window_pos;
 
 	uv2 ws = ctx->window_size;
 
+	DrawRectangle(ctx->window_pos.x, ctx->window_pos.y, ws.w, ws.h, ctx->bg);
+
 	v2 pad = {.x = 0.05 * ws.w, .y = 0.05 * ws.h};
 	Rect upper = {
-		.pos  = {.x = pad.x,            .y = pad.y},
-		.size = {.w = ws.w - 2 * pad.x, .h = ws.h * 0.6},
+		.pos  = {.x = ctx->window_pos.x + pad.x, .y = ctx->window_pos.y + pad.y},
+		.size = {.w = ws.w - 2 * pad.x,          .h = ws.h * 0.6},
 	};
 	Rect lower = {
-		.pos  = {.x = pad.x,            .y = pad.y + ws.h * 0.6},
+		.pos  = {.x = upper.pos.x,      .y = upper.pos.y + ws.h * 0.6},
 		.size = {.w = ws.w - 2 * pad.x, .h = ws.h * 0.4 - 1 * pad.y},
 	};
 
@@ -1219,4 +1216,9 @@ do_colour_picker(ColourPickerCtx *ctx)
 			btn_r.pos.y += 0.54 * mb.size.h;
 		}
 	}
+
+#ifdef _DEBUG
+	DrawFPS(20, 20);
+#endif
+
 }

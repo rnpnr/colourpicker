@@ -16,7 +16,7 @@ typedef struct timespec Filetime;
 static const char *libname = "./libcolourpicker.so";
 static void *libhandle;
 
-typedef void (do_colour_picker_fn)(ColourPickerCtx *);
+typedef void (do_colour_picker_fn)(ColourPickerCtx *, f32 dt, Vector2 window_pos, Vector2 mouse);
 static do_colour_picker_fn *do_colour_picker;
 
 static Filetime
@@ -160,7 +160,8 @@ main(i32 argc, char *argv[])
 		do_debug();
 
 		BeginDrawing();
-		do_colour_picker(&ctx);
+		ClearBackground(ctx.bg);
+		do_colour_picker(&ctx, GetFrameTime(), (Vector2){0}, GetMousePosition());
 		EndDrawing();
 	}
 
