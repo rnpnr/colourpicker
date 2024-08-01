@@ -1187,7 +1187,8 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 						SetClipboardText(txt);
 						break;
 					case 1:
-						txt        = (char *)GetClipboardText();
+						txt = (char *)GetClipboardText();
+						if (!txt) break;
 						new_colour = normalize_colour(parse_hex_u32(txt));
 						store_formatted_colour(ctx, new_colour, CM_RGB);
 						if (ctx->mode == CPM_PICKER) {
