@@ -13,7 +13,7 @@
 typedef struct {uint8_t *data; ptrdiff_t len;} s8;
 
 static s8
-read_whole_file(char *name)
+read_whole_file(char *name, s8 mem)
 {
 	s8 res = {0};
 	FILE *fp = fopen(name, "r");
@@ -27,11 +27,11 @@ read_whole_file(char *name)
 	res.len = ftell(fp);
 	rewind(fp);
 
-	res.data = malloc(res.len);
-	if (!res.data) {
-		fputs("Failed to allocate space for reading file!\n", stdout);
+	if (mem.len < res.len) {
+		fputs("Not enough space for reading file!\n", stdout);
 		exit(1);
 	}
+	res.data = mem.data;
 	fread(res.data, res.len, 1, fp);
 	fclose(fp);
 	return res;
@@ -66,51 +66,21 @@ load_font(s8 font_data, Image *out, int font_size)
 		font.glyphPadding = 4;
 		*out = GenImageFontAtlas(font.glyphs, &font.recs, font.glyphCount,
 		                         font.baseSize, font.glyphPadding, 0);
-
-		// Update glyphs[i].image to use alpha, required to be used on ImageDrawText()
-		for (int i = 0; i < font.glyphCount; i++) {
-			UnloadImage(font.glyphs[i].image);
-			font.glyphs[i].image = ImageFromImage(*out, font.recs[i]);
-		}
 	}
 	return font;
 }
 
 /* NOTE: Modified from raylib. Used to save font data without opening a window */
 static void
-export_font_as_code(Font font, Image image, const char *fileName)
+export_font_as_code(Font font, Image image, const char *fileName, char *txt)
 {
 	#define TEXT_BYTES_PER_LINE     20
-	#define MAX_FONT_DATA_SIZE      1024*1024       // 1 MB
 
 	// Get file name from path
 	char fileNamePascal[256] = { 0 };
 	strncpy(fileNamePascal, TextToPascal(GetFileNameWithoutExt(fileName)), 256 - 1);
 
-	// NOTE: Text data buffer size is estimated considering image data size in bytes
-	// and requiring 6 char bytes for every byte: "0x00, "
-	char *txt = calloc(MAX_FONT_DATA_SIZE, 1);
-
 	int off = 0;
-	off += sprintf(txt + off, "////////////////////////////////////////////////////////////////////////////////////////\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "// FontAsCode exporter v1.0 - Font data exported as an array of bytes                 //\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "// more info and bugs-report:  github.com/raysan5/raylib                              //\n");
-	off += sprintf(txt + off, "// feedback and support:       ray[at]raylib.com                                      //\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "// Copyright (c) 2018-2024 Ramon Santamaria (@raysan5)                                //\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "// ---------------------------------------------------------------------------------- //\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "// TODO: Fill the information and license of the exported font here:                  //\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "// Font name:    ....                                                                 //\n");
-	off += sprintf(txt + off, "// Font creator: ....                                                                 //\n");
-	off += sprintf(txt + off, "// Font LICENSE: ....                                                                 //\n");
-	off += sprintf(txt + off, "//                                                                                    //\n");
-	off += sprintf(txt + off, "////////////////////////////////////////////////////////////////////////////////////////\n\n");
-
 	// Support font export and initialization
 	// NOTE: This mechanism is highly coupled to raylib
 	int imageDataSize = GetPixelDataSize(image.width, image.height, image.format);
@@ -152,8 +122,8 @@ export_font_as_code(Font font, Image image, const char *fileName)
 	off += sprintf(txt + off, "static GlyphInfo fontGlyphs_%s[%i] = {\n", fileNamePascal, font.glyphCount);
 	for (int i = 0; i < font.glyphCount; i++) {
 		off += sprintf(txt + off, "    { %i, %i, %i, %i, { 0 }},\n",
-		                     font.glyphs[i].value, font.glyphs[i].offsetX,
-		                     font.glyphs[i].offsetY, font.glyphs[i].advanceX);
+		               font.glyphs[i].value, font.glyphs[i].offsetX,
+		               font.glyphs[i].offsetY, font.glyphs[i].advanceX);
 	}
 	off += sprintf(txt + off, "};\n\n");
 
@@ -172,10 +142,6 @@ export_font_as_code(Font font, Image image, const char *fileName)
 	off += sprintf(txt + off, "    // Load texture from image\n");
 	off += sprintf(txt + off, "    font.texture = LoadTextureFromImage(imFont);\n");
 	off += sprintf(txt + off, "    UnloadImage(imFont);  // Uncompressed data can be unloaded from memory\n\n");
-	// We have two possible mechanisms to assign font.recs and font.glyphs data,
-	// that data is already available as global arrays, we two options to assign that data:
-	//  - 1. Data copy. This option consumes more memory and Font MUST be unloaded by user, requiring additional code
-	//  - 2. Data assignment. This option consumes less memory and Font MUST NOT be unloaded by user because data is on protected DATA segment
 	off += sprintf(txt + off, "    // Assign glyph recs and info data directly\n");
 	off += sprintf(txt + off, "    // WARNING: This font data must not be unloaded\n");
 	off += sprintf(txt + off, "    font.recs = fontRecs_%s;\n", fileNamePascal);
@@ -190,11 +156,14 @@ export_font_as_code(Font font, Image image, const char *fileName)
 int
 main(void)
 {
+	static char mem[2u * 1024u * 1024u];
+	s8 smem = {.data = (uint8_t *)mem, .len = sizeof(mem)};
+
 	SetTraceLogLevel(LOG_NONE);
 	Image atlas;
-	s8 font_data = read_whole_file("assets/Lora-SemiBold.ttf");
+	s8 font_data = read_whole_file("assets/Lora-SemiBold.ttf", smem);
 	Font font = load_font(font_data, &atlas, FONT_SIZE);
-	export_font_as_code(font, atlas, "font_inc.h");
+	export_font_as_code(font, atlas, "font_inc.h", mem);
 
 	FILE *out_file = fopen("shader_inc.h", "w");
 	if (!out_file) {
@@ -202,7 +171,7 @@ main(void)
 		return 1;
 	}
 
-	s8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME);
+	s8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME, smem);
 	s8 s = shader_data;
 	/* NOTE: skip over license notice */
 	s8 line = get_line(&s);
