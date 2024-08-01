@@ -32,7 +32,7 @@ fi
 [ ! -s "config.h" ] && cp config.def.h config.h
 
 if [ ! -e "shader_inc.h" ] || [ "hsv_lerp.glsl" -nt "shader_inc.h" ]; then
-	${cc} $cflags -o gen_incs gen_incs.c $ldflags -flto -s
+	${cc} $cflags -o gen_incs gen_incs.c $ldflags
 	./gen_incs
 fi
 
