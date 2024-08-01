@@ -140,6 +140,10 @@ typedef struct {
 } InputState;
 
 typedef struct {
+	f32 hover_t;
+} ButtonState;
+
+typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
@@ -158,6 +162,7 @@ typedef struct {
 	PickerModeState pms;
 	SliderState     ss;
 	StatusBarState  sbs;
+	ButtonState     buttons[2];
 
 	i32 held_idx;
 

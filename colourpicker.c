@@ -402,6 +402,29 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 	}
 }
 
+static b32
+do_clickable_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *text, v4 fg, Color bg)
+{
+	b32 hovered = CheckCollisionPointRec(mouse.rv, r.rr);
+	b32 pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
+	if (hovered) btn->hover_t += TEXT_HOVER_SPEED * ctx->dt;
+	else         btn->hover_t -= TEXT_HOVER_SPEED * ctx->dt;
+	CLAMP01(btn->hover_t);
+
+	v2 tpos   = center_align_text_in_rect(r, text, ctx->font, ctx->font_size);
+	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
+	v4 colour = lerp_v4(fg, ctx->hover_colour, btn->hover_t);
+
+	DrawRectangleRounded(r.rr, SELECTOR_ROUNDNESS, 0, bg);
+	DrawRectangleRoundedLinesEx(r.rr, SELECTOR_ROUNDNESS, 0, SELECTOR_BORDER_WIDTH,
+	                            SELECTOR_BORDER_COLOUR);
+	DrawTextEx(ctx->font, text, spos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
+	DrawTextEx(ctx->font, text, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
+
+	return pressed;
+}
+
 static void
 do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 {
@@ -1169,60 +1192,31 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		}
 
 		static char *button_text[2] = {"Copy", "Paste"};
-		static f32 button_colour_t[2];
 		v4 fg         = normalize_colour(pack_rl_colour(ctx->fg));
 		Color bg      = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 
 		for (u32 i = 0; i < 2; i++) {
-			if (CheckCollisionPointRec(ctx->mouse_pos.rv, btn_r.rr)) {
-				if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-					char *txt;
-					v4 new_colour;
-					switch (i) {
-					case 0:
-						txt = (char *)TextFormat("%02x%02x%02x%02x",
-						                         bg.r, bg.g, bg.b, bg.a);
-						SetClipboardText(txt);
-						break;
-					case 1:
-						txt = (char *)GetClipboardText();
-						if (!txt) break;
-						new_colour = normalize_colour(parse_hex_u32(txt));
-						store_formatted_colour(ctx, new_colour, CM_RGB);
-						if (ctx->mode == CPM_PICKER) {
-							f32 hue = rgb_to_hsv(new_colour).x;
-							ctx->pms.base_hue       = hue;
-							ctx->pms.fractional_hue = 0;
-						}
-						break;
-					default:
-						ASSERT(0);
-						break;
-					}
-				}
-				button_colour_t[i] += TEXT_HOVER_SPEED * ctx->dt;
-			} else {
-				button_colour_t[i] -= TEXT_HOVER_SPEED * ctx->dt;
-			}
-			CLAMP01(button_colour_t[i]);
-
-			v2 tpos = center_align_text_in_rect(btn_r, button_text[i], ctx->font,
-			                                    ctx->font_size);
-			v2 spos = {.x = tpos.x + 1.75, .y = tpos.y + 2};
-
-			v4 colour = lerp_v4(fg, ctx->hover_colour, button_colour_t[i]);
-
-			DrawRectangleRounded(btn_r.rr, SELECTOR_ROUNDNESS, 0, bg);
-			DrawRectangleRoundedLinesEx(btn_r.rr, SELECTOR_ROUNDNESS, 0,
-			                            SELECTOR_BORDER_WIDTH, SELECTOR_BORDER_COLOUR);
-			DrawTextEx(ctx->font, button_text[i], spos.rv, ctx->font_size, 0,
-			           Fade(BLACK, 0.8));
-			DrawTextEx(ctx->font, button_text[i], tpos.rv, ctx->font_size, 0,
-			           colour_from_normalized(colour));
-
+			b32 pressed = do_clickable_button(ctx, ctx->buttons + i, ctx->mouse_pos,
+			                                  btn_r, button_text[i], fg, bg);
 			btn_r.pos.y += 0.54 * mb.size.h;
+			if (!pressed) continue;
+
+			if (i == 0) {
+				SetClipboardText(TextFormat("%02x%02x%02x%02x",
+				                            bg.r, bg.g, bg.b, bg.a));
+			} else {
+				char *txt = (char *)GetClipboardText();
+				if (!txt) continue;
+				v4 new_colour = normalize_colour(parse_hex_u32(txt));
+				store_formatted_colour(ctx, new_colour, CM_RGB);
+				if (ctx->mode == CPM_PICKER) {
+					f32 hue = rgb_to_hsv(new_colour).x;
+					ctx->pms.base_hue       = hue;
+					ctx->pms.fractional_hue = 0;
+				}
+			}
 		}
 	}
 
