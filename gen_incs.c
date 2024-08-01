@@ -1,11 +1,30 @@
 #include <raylib.h>
 
-#include <stdlib.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "config.h"
 
 #define ISSPACE(a)  ((a) == ' ' || (a) == '\t')
+
+typedef struct {int8_t *data; ptrdiff_t len;} s8;
+
+static s8
+get_line(s8 *s)
+{
+	s8 res = {.data = s->data};
+	while (s->len && s->data[0] != '\n') {
+		s->data++;
+		s->len--;
+		res.len++;
+	}
+	/* NOTE: skip over trailing \n */
+	s->data++;
+	s->len--;
+	return res;
+}
 
 int
 main(void)
@@ -26,25 +45,33 @@ main(void)
 		return 1;
 	}
 
-	char *line = NULL;
-	size_t len = 0;
-	ssize_t read;
+	fseek(shader_file, 0, SEEK_END);
+	s8 shader_data = {.len = ftell(shader_file)};
+	rewind(shader_file);
 
+	shader_data.data = malloc(shader_data.len);
+	if (!shader_data.data) {
+		fputs("Failed to allocate space for reading shader file!\n", stdout);
+		return 1;
+	}
+	fread(shader_data.data, shader_data.len, 1, shader_file);
+
+	s8 s = shader_data;
 	/* NOTE: skip over license notice */
-	getline(&line, &len, shader_file);
+	s8 line = get_line(&s);
 	fputs("static char *g_hsv_shader_text =\n\t", out_file);
-	while ((read = getline(&line, &len, shader_file)) != -1) {
-		char *s;
-		for (s = line; *s; s++, read--) {
-			if (!ISSPACE(*s))
-				break;
+	do {
+		line = get_line(&s);
+		while (line.len && ISSPACE(*line.data)) {
+			line.data++;
+			line.len--;
 		}
-		if (read > 1) {
+		if (line.len) {
 			fputc('"', out_file);
-			fwrite(s, read - 1, 1, out_file);
+			fwrite(line.data, line.len, 1, out_file);
 			fputs("\\n\"\n\t", out_file);
 		}
-	}
+	} while (s.len > 0);
 	fputs(";\n", out_file);
 	fclose(out_file);
 	fclose(shader_file);
