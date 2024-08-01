@@ -163,6 +163,7 @@ typedef struct {
 
 	f32 selection_hover_t[2];
 	v4  hover_colour;
+	v4  cursor_colour;
 
 	Shader picker_shader;
 	RenderTexture slider_texture;

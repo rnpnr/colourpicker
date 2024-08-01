@@ -87,16 +87,17 @@ main(i32 argc, char *argv[])
 		.colour_mode = CM_HSV,
 		.flags       = CPF_REFILL_TEXTURE,
 
-		.colour   = {.r = 0.53, .g = 0.82, .b = 0.59, .a = 1.0},
 
 		.is  = {.idx = -1, .cursor_t = 1, .cursor_t_target = 0},
 		.mcs = {.mode_visible_t = 1, .next_mode = -1},
 		.ss  = {.scale_t = {1, 1, 1, 1}},
 
-		.bg = { .r = 0x26, .g = 0x1e, .b = 0x22, .a = 0xff },
-		.fg = { .r = 0xea, .g = 0xe1, .b = 0xb4, .a = 0xff },
+		.bg = COLOUR_PICKER_BG,
+		.fg = COLOUR_PICKER_FG,
 
-		.hover_colour = {.r = 0.85, .g = 0.38, .b = 0.38, .a = 1.00},
+		.colour        = STARTING_COLOUR,
+		.hover_colour  = HOVER_COLOUR,
+		.cursor_colour = CURSOR_COLOUR,
 
 		.colour_stack = {
 			.fade_param = 1.0f,

@@ -323,9 +323,9 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 		else                              ctx->is.cursor_t_target = 0;
 	}
 
-	v4 bg = ctx->hover_colour;
+	v4 bg = ctx->cursor_colour;
 	bg.a  = 0;
-	Color cursor_colour = colour_from_normalized(lerp_v4(bg, ctx->hover_colour,
+	Color cursor_colour = colour_from_normalized(lerp_v4(bg, ctx->cursor_colour,
 	                                                     ctx->is.cursor_t));
 
 	/* NOTE: guess a cursor position */
