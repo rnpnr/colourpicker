@@ -293,8 +293,8 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 		return;
 
 	ASSERT(CheckCollisionPointRec(mouse.rv, r.rr));
-	ctx->is.cursor_p = (mouse.x - r.pos.x) / r.size.w;
-	CLAMP01(ctx->is.cursor_p);
+	ctx->is.cursor_hover_p = (mouse.x - r.pos.x) / r.size.w;
+	CLAMP01(ctx->is.cursor_hover_p);
 }
 
 static void
@@ -330,10 +330,18 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 
 	/* NOTE: guess a cursor position */
 	if (ctx->is.cursor == -1) {
-		f32 narrow_char_scale = 1.1;
-		if (ctx->is.idx != INPUT_HEX) narrow_char_scale = 1.45;
-		ctx->is.cursor = ctx->is.cursor_p * ctx->is.buf_len * narrow_char_scale;
-		CLAMP(ctx->is.cursor, 0, ctx->is.buf_len);
+		/* NOTE: extra offset to help with putting a cursor at idx 0 */
+		#define TEXT_HALF_CHAR_WIDTH 10
+		f32 x_off = TEXT_HALF_CHAR_WIDTH, x_bounds = r.size.w * ctx->is.cursor_hover_p;
+		u32 i;
+		for (i = 0; i < ctx->is.buf_len && x_off < x_bounds; i++) {
+			u32 idx = GetGlyphIndex(ctx->font, ctx->is.buf[i]);
+			if (ctx->font.glyphs[idx].advanceX == 0)
+				x_off += ctx->font.recs[idx].width;
+			else
+				x_off += ctx->font.glyphs[idx].advanceX;
+		}
+		ctx->is.cursor = i;
 	}
 
 	/* NOTE: Braindead NULL termination stupidity */

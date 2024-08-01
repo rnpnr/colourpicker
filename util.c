@@ -132,7 +132,7 @@ typedef struct {
 typedef struct {
 	i32  idx;
 	i32  cursor;
-	f32  cursor_p;
+	f32  cursor_hover_p;
 	f32  cursor_t;
 	f32  cursor_t_target;
 	i32  buf_len;
