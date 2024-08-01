@@ -1191,24 +1191,18 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 			txt_out.pos.x += mb.size.w + mode_x_pad;
 		}
 
-		static char *button_text[2] = {"Copy", "Paste"};
 		v4 fg         = normalize_colour(pack_rl_colour(ctx->fg));
 		Color bg      = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 
-		for (u32 i = 0; i < 2; i++) {
-			b32 pressed = do_clickable_button(ctx, ctx->buttons + i, ctx->mouse_pos,
-			                                  btn_r, button_text[i], fg, bg);
-			btn_r.pos.y += 0.54 * mb.size.h;
-			if (!pressed) continue;
+		if (do_clickable_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, "Copy", fg, bg))
+			SetClipboardText(TextFormat("%02x%02x%02x%02x", bg.r, bg.g, bg.b, bg.a));
+		btn_r.pos.y += 0.54 * mb.size.h;
 
-			if (i == 0) {
-				SetClipboardText(TextFormat("%02x%02x%02x%02x",
-				                            bg.r, bg.g, bg.b, bg.a));
-			} else {
-				char *txt = (char *)GetClipboardText();
-				if (!txt) continue;
+		if (do_clickable_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, "Paste", fg, bg)) {
+			char *txt = (char *)GetClipboardText();
+			if (txt) {
 				v4 new_colour = normalize_colour(parse_hex_u32(txt));
 				store_formatted_colour(ctx, new_colour, CM_RGB);
 				if (ctx->mode == CPM_PICKER) {
