@@ -147,6 +147,8 @@ typedef struct {
 	v2  window_pos;
 	v2  mouse_pos;
 
+	f32 dt;
+
 	Font font;
 	i32  font_size;
 	Color bg, fg;
@@ -162,13 +164,11 @@ typedef struct {
 	f32 selection_hover_t[2];
 	v4  hover_colour;
 
-	f32 dt;
-
+	Shader picker_shader;
 	RenderTexture slider_texture;
 	RenderTexture picker_texture;
 	RenderTexture hsv_texture;
 
-	Shader picker_shader;
 	i32    mode_id, hsv_id;
 	i32    offset_id, size_id;
 
