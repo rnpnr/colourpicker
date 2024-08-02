@@ -167,7 +167,7 @@ main(i32 argc, char *argv[])
 	}
 
 	v4 rgba = {0};
-	switch (ctx.mode) {
+	switch (ctx.colour_mode) {
 	case CM_RGB: rgba = ctx.colour;             break;
 	case CM_HSV: rgba = hsv_to_rgb(ctx.colour); break;
 	default:     ASSERT(0);                     break;
