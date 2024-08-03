@@ -40,7 +40,7 @@ if [ "$debug" ]; then
 	# Hot Reloading/Debugging
 	cflags="$cflags -O0 -ggdb -D_DEBUG -Wno-unused-function"
 	# NOTE: needed for sync(3p)
-	cflags="$cflags -D_XOPEN_SOURCE=600"
+	cflags="$cflags -D_XOPEN_SOURCE=700"
 
 	libcflags="$cflags -fPIC"
 	libldflags="$ldflags -shared"
