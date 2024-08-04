@@ -208,7 +208,7 @@ step_colour_mode(ColourPickerCtx *ctx, i32 inc)
 }
 
 static void
-fill_hsv_texture(RenderTexture texture, v4 hsv)
+fill_hsv_texture(RenderTexture texture, v4 hsv, Color bg)
 {
 	f32 line_length = (f32)texture.texture.height / 3;
 	v2 vtop = {0};
@@ -223,6 +223,7 @@ fill_hsv_texture(RenderTexture texture, v4 hsv)
 
 	f32 inc = 1.0 / texture.texture.width;
 	BeginTextureMode(texture);
+		ClearBackground(bg);
 		for (u32 i = 0; i < texture.texture.width; i++) {
 			DrawLineV(sbot.rv, hbot.rv, colour_from_normalized(hsv_to_rgb(h)));
 			DrawLineV(vbot.rv, sbot.rv, colour_from_normalized(hsv_to_rgb(s)));
@@ -815,7 +816,7 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_origin)
 			UnloadRenderTexture(ctx->hsv_texture);
 			ctx->hsv_texture = LoadRenderTexture(w, h);
 		}
-		fill_hsv_texture(ctx->hsv_texture, ctx->colour);
+		fill_hsv_texture(ctx->hsv_texture, get_formatted_colour(ctx, CM_HSV), ctx->bg);
 		ctx->flags &= ~CPF_REFILL_TEXTURE;
 	}
 
