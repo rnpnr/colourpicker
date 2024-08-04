@@ -100,8 +100,6 @@ main(i32 argc, char *argv[])
 		.cursor_colour = CURSOR_COLOUR,
 
 		.colour_stack = {
-			.fade_param = 1.0f,
-			.scales = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
 			.items  = {
 				{ .r = 0.04, .g = 0.04, .b = 0.04, .a = 1.00 },
 				{ .r = 0.92, .g = 0.88, .b = 0.78, .a = 1.00 },

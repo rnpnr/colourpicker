@@ -23,6 +23,7 @@
 #define DEBUG_EXPORT static
 #endif
 
+typedef uint8_t   u8;
 typedef int32_t   i32;
 typedef uint32_t  u32;
 typedef uint32_t  b32;
@@ -81,6 +82,8 @@ enum input_indices {
 
 enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
+#define BUTTON_HOVER_SPEED     8.0f
+
 #define SLIDER_BORDER_COLOUR   (Color){.r = 0x00, .g = 0x00, .b = 0x00, .a = 0xCC}
 #define SLIDER_BORDER_WIDTH    3.0f
 #define SLIDER_ROUNDNESS       0.5f
@@ -98,14 +101,19 @@ enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
 #define TEXT_HOVER_SPEED       5.0f
 
+typedef struct {
+	f32 hover_t;
+} ButtonState;
+
 #define COLOUR_STACK_ITEMS 8
 typedef struct {
-	v4  last;
+	ButtonState buttons[COLOUR_STACK_ITEMS];
 	v4  items[COLOUR_STACK_ITEMS];
-	f32 scales[COLOUR_STACK_ITEMS];
+	v4  last;
 	i32 widx;
 	f32 fade_param;
-	f32 yoff;
+	f32 y_off_t;
+	ButtonState tri_btn;
 } ColourStackState;
 
 typedef struct {
@@ -138,10 +146,6 @@ typedef struct {
 	i32  buf_len;
 	char buf[64];
 } InputState;
-
-typedef struct {
-	f32 hover_t;
-} ButtonState;
 
 typedef struct {
 	v4 colour, previous_colour;

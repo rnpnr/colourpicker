@@ -25,6 +25,19 @@ move_towards_f32(f32 current, f32 target, f32 delta)
 	return current;
 }
 
+static Color
+fade(Color a, f32 alpha)
+{
+	a.a = (u8)((f32)a.a * alpha);
+	return a;
+}
+
+static f32
+lerp(f32 a, f32 b, f32 t)
+{
+	return a + t * (b - a);
+}
+
 static v4
 lerp_v4(v4 a, v4 b, f32 t)
 {
@@ -403,22 +416,44 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 }
 
 static b32
-do_clickable_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *text, v4 fg, Color bg)
+do_button(ButtonState *btn, v2 mouse, Rect r, f32 dt, f32 hover_speed)
 {
 	b32 hovered = CheckCollisionPointRec(mouse.rv, r.rr);
 	b32 pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 
-	if (hovered) btn->hover_t += TEXT_HOVER_SPEED * ctx->dt;
-	else         btn->hover_t -= TEXT_HOVER_SPEED * ctx->dt;
+	if (hovered) btn->hover_t += hover_speed * dt;
+	else         btn->hover_t -= hover_speed * dt;
 	CLAMP01(btn->hover_t);
+
+	return pressed;
+}
+
+static b32
+do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_speed, f32 scale_target, f32 fade_t)
+{
+	b32 pressed = do_button(btn, mouse, r, dt, hover_speed);
+
+	f32 param = lerp(1, scale_target, btn->hover_t);
+	v2  scale = {.x = param, .y = param};
+	DrawRectangleRounded(scale_rect_centered(r, scale).rr, SELECTOR_ROUNDNESS, 0,
+	                     fade(SELECTOR_BORDER_COLOUR, fade_t));
+	scale.x *= 0.95;
+	scale.y *= 0.90;
+	DrawRectangleRounded(scale_rect_centered(r, scale).rr, SELECTOR_ROUNDNESS, 0,
+	                     fade(bg, fade_t));
+
+	return pressed;
+}
+
+static b32
+do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *text, v4 fg, Color bg)
+{
+	b32 pressed = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
 
 	v2 tpos   = center_align_text_in_rect(r, text, ctx->font, ctx->font_size);
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
 	v4 colour = lerp_v4(fg, ctx->hover_colour, btn->hover_t);
 
-	DrawRectangleRounded(r.rr, SELECTOR_ROUNDNESS, 0, bg);
-	DrawRectangleRoundedLinesEx(r.rr, SELECTOR_ROUNDNESS, 0, SELECTOR_BORDER_WIDTH,
-	                            SELECTOR_BORDER_COLOUR);
 	DrawTextEx(ctx->font, text, spos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
 	DrawTextEx(ctx->font, text, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
 
@@ -628,44 +663,6 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 }
 
 static void
-do_colour_stack_item(ColourPickerCtx *ctx, Rect r, i32 item_idx, b32 fade)
-{
-	ColourStackState *css = &ctx->colour_stack;
-	f32 fade_param = fade? css->fade_param : 0;
-	f32 stack_scale_target = (f32)(ARRAY_COUNT(css->items) + 1) / ARRAY_COUNT(css->items);
-	f32 stack_scale_delta  = (stack_scale_target - 1) * 8 * ctx->dt;
-
-	v4 colour = css->items[item_idx];
-
-	b32 stack_collides = CheckCollisionPointRec(ctx->mouse_pos.rv, r.rr);
-	if (stack_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		v4 hsv = rgb_to_hsv(colour);
-		store_formatted_colour(ctx, hsv, CM_HSV);
-		if (ctx->mode == CPM_PICKER) {
-			ctx->pms.base_hue       = hsv.x;
-			ctx->pms.fractional_hue = 0;
-		}
-	}
-
-	css->scales[item_idx] = move_towards_f32(css->scales[item_idx],
-	                                         stack_collides? stack_scale_target : 1,
-	                                         stack_scale_delta);
-	f32 scale = css->scales[item_idx];
-	Rect draw_rect = {
-		.pos = {
-			.x = r.pos.x - (scale - 1) * r.size.w / 2,
-			.y = r.pos.y - (scale - 1) * r.size.h / 2 + css->yoff,
-		},
-		.size = { .x = r.size.w * scale, .y = r.size.h * scale },
-	};
-	Color disp = colour_from_normalized(colour);
-	DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, Fade(disp, 1 - fade_param));
-	draw_rect = scale_rect_centered(draw_rect, (v2){.x = 0.96, .y = 0.96});
-	DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, STACK_BORDER_WIDTH,
-	                            Fade(STACK_BORDER_COLOUR, 1 - fade_param));
-}
-
-static void
 do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 {
 	ColourStackState *css = &ctx->colour_stack;
@@ -680,55 +677,62 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	r.pos.x  += (sa.size.w - r.size.w) * 0.5;
 
 	f32 y_pos_delta = r.size.h + 10;
+	r.pos.y -= y_pos_delta * css->y_off_t;
 
-	f32 stack_off_target = -y_pos_delta;
-	f32 stack_off_delta  = -stack_off_target * 5 * ctx->dt;
-
-	b32 fade_stack = css->fade_param != 1.0f;
-	if (fade_stack) {
-		Rect draw_rect   = r;
-		draw_rect.pos.y += css->yoff;
+	/* NOTE: Stack is moving up; draw last top item as it moves up and fades out */
+	if (css->fade_param) {
+		ButtonState btn;
+		do_rect_button(&btn, ctx->mouse_pos, r, colour_from_normalized(css->last), ctx->dt,
+		               0, 1, css->fade_param);
 		r.pos.y += y_pos_delta;
-		Color old = Fade(colour_from_normalized(css->last), css->fade_param);
-		DrawRectangleRounded(draw_rect.rr, STACK_ROUNDNESS, 0, old);
-		DrawRectangleRoundedLinesEx(draw_rect.rr, STACK_ROUNDNESS, 0, STACK_BORDER_WIDTH,
-		                            Fade(STACK_BORDER_COLOUR, css->fade_param));
 	}
+
+	f32 stack_scale_target = (f32)(ARRAY_COUNT(css->items) + 1) / ARRAY_COUNT(css->items);
 
 	u32 loop_items = ARRAY_COUNT(css->items) - 1;
 	for (u32 i = 0; i < loop_items; i++) {
-		i32 cidx = (css->widx + i) % ARRAY_COUNT(css->items);
-		do_colour_stack_item(ctx, r, cidx, 0);
+		i32 cidx    = (css->widx + i) % ARRAY_COUNT(css->items);
+		Color bg    = colour_from_normalized(css->items[cidx]);
+		b32 pressed = do_rect_button(css->buttons + cidx, ctx->mouse_pos, r, bg, ctx->dt,
+		                             BUTTON_HOVER_SPEED, stack_scale_target, 1);
+		if (pressed) {
+			v4 hsv = rgb_to_hsv(css->items[cidx]);
+			store_formatted_colour(ctx, hsv, CM_HSV);
+			if (ctx->mode == CPM_PICKER) {
+				ctx->pms.base_hue       = hsv.x;
+				ctx->pms.fractional_hue = 0;
+			}
+		}
 		r.pos.y += y_pos_delta;
 	}
 
 	i32 last_idx = (css->widx + loop_items) % ARRAY_COUNT(css->items);
-	do_colour_stack_item(ctx, r, last_idx, fade_stack);
+	do_rect_button(css->buttons + last_idx, ctx->mouse_pos, r,
+	               colour_from_normalized(css->items[last_idx]), ctx->dt, BUTTON_HOVER_SPEED,
+	               stack_scale_target, 1 - css->fade_param);
 
-	css->fade_param = move_towards_f32(css->fade_param, fade_stack? 0 : 1, 8 * ctx->dt);
-	css->yoff       = move_towards_f32(css->yoff, fade_stack? stack_off_target : 0, stack_off_delta);
-	if (css->yoff == stack_off_target) {
-		css->fade_param = 1.0f;
-		css->yoff       = 0;
+	css->fade_param -= BUTTON_HOVER_SPEED * ctx->dt;
+	css->y_off_t    += BUTTON_HOVER_SPEED * ctx->dt;
+	if (css->fade_param < 0) {
+		css->fade_param = 0;
+		css->y_off_t    = 0;
 	}
 
 	r.pos.y   = sa.pos.y + sa.size.h - r.size.h;
 	r.pos.x  += r.size.w * 0.1;
 	r.size.w *= 0.8;
 
-	b32 push_collides  = CheckCollisionPointRec(ctx->mouse_pos.rv, r.rr);
-	static f32 param   = 0.0;
-	param = move_towards_f32(param, push_collides? 1 : 0, 8 * ctx->dt);
-
+	b32 push_pressed = do_button(&css->tri_btn, ctx->mouse_pos, r, ctx->dt, BUTTON_HOVER_SPEED);
+	f32 param    = css->tri_btn.hover_t;
 	v2 tri_size  = {.x = 0.25 * r.size.w,          .y = 0.5 * r.size.h};
 	v2 tri_scale = {.x = 1 - 0.5 * param,          .y = 1 + 0.3 * param};
 	v2 tri_mid   = {.x = r.pos.x + 0.5 * r.size.w, .y = r.pos.y - 0.3 * r.size.h * param};
 	draw_cardinal_triangle(tri_mid, tri_size, tri_scale, NORTH, ctx->fg);
 
-	if (push_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-		css->fade_param         -= 1e-6;
-		css->last                = css->items[css->widx];
-		css->items[css->widx++]  = get_formatted_colour(ctx, CM_RGB);
+	if (push_pressed) {
+		css->fade_param         = 1.0;
+		css->last               = css->items[css->widx];
+		css->items[css->widx++] = get_formatted_colour(ctx, CM_RGB);
 		if (css->widx == ARRAY_COUNT(css->items))
 			css->widx = 0;
 	}
@@ -1196,11 +1200,11 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 
-		if (do_clickable_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, "Copy", fg, bg))
+		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, "Copy", fg, bg))
 			SetClipboardText(TextFormat("%02x%02x%02x%02x", bg.r, bg.g, bg.b, bg.a));
 		btn_r.pos.y += 0.54 * mb.size.h;
 
-		if (do_clickable_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, "Paste", fg, bg)) {
+		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, "Paste", fg, bg)) {
 			char *txt = (char *)GetClipboardText();
 			if (txt) {
 				v4 new_colour = normalize_colour(parse_hex_u32(txt));
