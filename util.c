@@ -8,7 +8,8 @@
 #include <stdint.h>
 
 #include "shader_inc.h"
-#include "lora_sb_inc.h"
+#include "lora_sb_0_inc.h"
+#include "lora_sb_1_inc.h"
 #include "config.h"
 
 #ifndef asm
@@ -81,6 +82,8 @@ enum input_indices {
 };
 
 enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
+
+#define WINDOW_ASPECT_RATIO    (4.3f/3.2f)
 
 #define BUTTON_HOVER_SPEED     8.0f
 

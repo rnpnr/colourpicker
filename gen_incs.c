@@ -59,9 +59,16 @@ main(void)
 	s8 smem = {.data = mem, .len = sizeof(mem)};
 
 	SetTraceLogLevel(LOG_NONE);
-	char *font_inc_name = "lora_sb_inc.h";
-	if (!ExportFontAsCodeEx("assets/Lora-SemiBold.ttf", font_inc_name, FONT_SIZE, 0, 0))
-		printf("Failed to export font: %s\n", font_inc_name);
+	{
+		s8 tmem = smem;
+		int font_sizes[] = { FONT_SIZE, FONT_SIZE/2 };
+		for (int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
+			snprintf((char *)tmem.data, tmem.len, "lora_sb_%d_inc.h", i);
+			if (!ExportFontAsCodeEx("assets/Lora-SemiBold.ttf", (char *)tmem.data,
+			                        font_sizes[i], 0, 0))
+				printf("Failed to export font: %s\n", (char *)tmem.data);
+		}
+	}
 
 	FILE *out_file = fopen("external/include/shader_inc.h", "w");
 	if (!out_file) {

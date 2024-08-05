@@ -328,6 +328,12 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 	i32 buf_delta = ctx->is.buf_len - max_chars[ctx->is.idx];
 	if (buf_delta < 0) buf_delta = 0;
 	char *buf     = ctx->is.buf + buf_delta;
+	{
+		/* NOTE: drop a char if the subtext still doesn't fit */
+		v2 nts = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
+		if (nts.w > 0.96 * r.size.w)
+			buf++;
+	}
 	DrawTextEx(ctx->font, buf, pos.rv, ctx->font_size, 0, colour);
 
 	ctx->is.cursor_t = move_towards_f32(ctx->is.cursor_t, ctx->is.cursor_t_target,
@@ -364,7 +370,7 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 
 	v2 sts           = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
 	f32 cursor_x     = r.pos.x + sts.x;
-	f32 cursor_width = ctx->is.cursor == ctx->is.buf_len ? 20 : 6;
+	f32 cursor_width = ctx->is.cursor == ctx->is.buf_len ? ctx->window_size.w * 0.03 : ctx->window_size.w * 0.01;
 
 	buf[ctx->is.cursor - buf_delta] = saved_c;
 
@@ -467,10 +473,6 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 	Rect lr, sr, vr;
 	get_slider_subrects(r, &lr, &sr, &vr);
 
-	const char *label = mode_labels[ctx->colour_mode][label_idx];
-	v2 fpos = center_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
-	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
-
 	v2 test_pos = ctx->mouse_pos;
 	test_pos.x -= relative_origin.x;
 	test_pos.y -= relative_origin.y;
@@ -547,6 +549,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, NORTH, ctx->fg);
 	}
 
+	v2 fpos;
 	{
 		SliderState *s = &ctx->ss;
 		b32 collides = CheckCollisionPointRec(test_pos.rv, vr.rr);
@@ -578,6 +581,10 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 			do_text_input(ctx, vr, colour_rl);
 		}
 	}
+
+	const char *label = mode_labels[ctx->colour_mode][label_idx];
+	fpos = center_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
+	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
 }
 
 static void
@@ -677,7 +684,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	r.size.w *= 0.75;
 	r.pos.x  += (sa.size.w - r.size.w) * 0.5;
 
-	f32 y_pos_delta = r.size.h + 10;
+	f32 y_pos_delta = r.size.h * 1.2;
 	r.pos.y -= y_pos_delta * css->y_off_t;
 
 	/* NOTE: Stack is moving up; draw last top item as it moves up and fades out */
@@ -875,7 +882,7 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 
 	EndShaderMode();
 
-	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 4 * SLIDER_BORDER_WIDTH, ctx->bg);
+	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, 4.85 * SLIDER_BORDER_WIDTH, ctx->bg);
 	DrawRectangleRoundedLinesEx(r.rr, SLIDER_ROUNDNESS, 0, SLIDER_BORDER_WIDTH,
 	                            SLIDER_BORDER_COLOUR);
 
@@ -1050,6 +1057,18 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 DEBUG_EXPORT void
 do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse_pos)
 {
+	if (IsWindowResized()) {
+		ctx->window_size.h  = GetScreenHeight();
+		ctx->window_size.w  = ctx->window_size.h / WINDOW_ASPECT_RATIO;
+		ctx->flags         |= CPF_REFILL_TEXTURE;
+		SetWindowSize(ctx->window_size.w, ctx->window_size.h);
+
+		UnloadTexture(ctx->font.texture);
+		if (ctx->window_size.w < 480) ctx->font = LoadFont_lora_sb_1_inc();
+		else                          ctx->font = LoadFont_lora_sb_0_inc();
+		ctx->font_size = ctx->font.baseSize;
+	}
+
 	ctx->dt            = dt;
 	ctx->mouse_pos.rv  = mouse_pos;
 	ctx->window_pos.rv = window_pos;

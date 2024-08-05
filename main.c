@@ -151,8 +151,11 @@ main(i32 argc, char *argv[])
 
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
+	/* NOTE: do this after initing so that the window starts out floating in tiling wm */
+	SetWindowMinSize(320, 320 * WINDOW_ASPECT_RATIO);
+	SetWindowState(FLAG_WINDOW_RESIZABLE);
 
-	ctx.font      = LoadFont_lora_sb_inc();
+	ctx.font      = LoadFont_lora_sb_0_inc();
 	ctx.font_size = ctx.font.baseSize;
 
 	while(!WindowShouldClose()) {
