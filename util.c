@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 #include "shader_inc.h"
-#include "font_inc.h"
+#include "lora_sb_inc.h"
 #include "config.h"
 
 #ifndef asm

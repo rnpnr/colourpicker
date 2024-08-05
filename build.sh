@@ -17,7 +17,8 @@ if [ "$system_raylib" ]; then
 	ldflags="-L/usr/local/lib $ldflags"
 else
 	if  [ ! -f external/lib/libraylib.a ]; then
-		git submodule update --init --depth=1 external/raylib
+		git submodule update --init --checkout --depth=1 external/raylib
+		git -C external/raylib am --keep-non-patch --whitespace=nowarn "$PWD"/external/*.patch
 		cmake --install-prefix="${PWD}/external" \
 		      -G "Ninja" -B external/raylib/build -S external/raylib \
 		      -D CMAKE_INSTALL_LIBDIR=lib -D CMAKE_BUILD_TYPE="Release" \
@@ -31,9 +32,10 @@ fi
 
 [ ! -s "config.h" ] && cp config.def.h config.h
 
-if [ ! -e "shader_inc.h" ] || [ "hsv_lerp.glsl" -nt "shader_inc.h" ]; then
+if [ ! -e "external/include/shader_inc.h" ] || [ "hsv_lerp.glsl" -nt "external/include/shader_inc.h" ]; then
 	${cc} $cflags -o gen_incs gen_incs.c $ldflags
 	./gen_incs
+	mv lora_sb*.h external/include/
 fi
 
 if [ "$debug" ]; then

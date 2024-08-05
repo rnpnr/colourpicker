@@ -152,8 +152,8 @@ main(i32 argc, char *argv[])
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 
-	ctx.font_size = FONT_SIZE;
-	ctx.font      = LoadFont_FontInc();
+	ctx.font      = LoadFont_lora_sb_inc();
+	ctx.font_size = ctx.font.baseSize;
 
 	while(!WindowShouldClose()) {
 		do_debug();

@@ -3,6 +3,4 @@ colourpicker
 config.h
 external/include
 external/lib
-font_inc.h
 gen_incs
-shader_inc.h
