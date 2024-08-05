@@ -18,7 +18,7 @@ if [ "$system_raylib" ]; then
 else
 	if  [ ! -f external/lib/libraylib.a ]; then
 		git submodule update --init --checkout --depth=1 external/raylib
-		git -C external/raylib apply --whitespace=nowarn "$PWD"/external/*.patch
+		git -C external/raylib am --keep-non-patch --whitespace=nowarn "$PWD"/external/*.patch
 		cmake --install-prefix="${PWD}/external" \
 		      -G "Ninja" -B external/raylib/build -S external/raylib \
 		      -D CMAKE_INSTALL_LIBDIR=lib -D CMAKE_BUILD_TYPE="Release" \

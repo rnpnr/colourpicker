@@ -14,10 +14,14 @@ jobs:
     env:
       CC: "${{ matrix.cc }}"
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           sudo apt-get install libxkbcommon-dev xorg-dev libwayland-dev ninja-build
+      - name: Configure Git
+        run: |
+          git config --global user.email "fu@githubci.com"
+          git config --global user.name "F U"
+      - uses: actions/checkout@v4
       - name: Build
         run: ./build.sh
 
@@ -35,7 +39,6 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
       - uses: msys2/setup-msys2@v2
         with:
           msystem: ${{matrix.sys}}
@@ -43,5 +46,11 @@ jobs:
           install: git mingw-w64-${{matrix.env}}-${{matrix.cc}}
           pacboy: ninja:p cmake:p
 
+      - name: Configure Git
+        run: |
+          git config --global user.email "fu@githubci.com"
+          git config --global user.name "F U"
+
+      - uses: actions/checkout@v4
       - name: Build
         run: ./build.sh
