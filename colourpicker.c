@@ -696,12 +696,13 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 
 	f32 stack_scale_target = (f32)(ARRAY_COUNT(css->items) + 1) / ARRAY_COUNT(css->items);
 
-	u32 loop_items = ARRAY_COUNT(css->items) - 1;
-	for (u32 i = 0; i < loop_items; i++) {
+	f32 fade_scale[ARRAY_COUNT(css->items)] = { [ARRAY_COUNT(css->items) - 1] = 1 };
+	for (u32 i = 0; i < ARRAY_COUNT(css->items); i++) {
 		i32 cidx    = (css->widx + i) % ARRAY_COUNT(css->items);
 		Color bg    = colour_from_normalized(css->items[cidx]);
 		b32 pressed = do_rect_button(css->buttons + cidx, ctx->mouse_pos, r, bg, ctx->dt,
-		                             BUTTON_HOVER_SPEED, stack_scale_target, 1);
+		                             BUTTON_HOVER_SPEED, stack_scale_target,
+		                             1 - css->fade_param * fade_scale[i]);
 		if (pressed) {
 			v4 hsv = rgb_to_hsv(css->items[cidx]);
 			store_formatted_colour(ctx, hsv, CM_HSV);
@@ -712,11 +713,6 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 		}
 		r.pos.y += y_pos_delta;
 	}
-
-	i32 last_idx = (css->widx + loop_items) % ARRAY_COUNT(css->items);
-	do_rect_button(css->buttons + last_idx, ctx->mouse_pos, r,
-	               colour_from_normalized(css->items[last_idx]), ctx->dt, BUTTON_HOVER_SPEED,
-	               stack_scale_target, 1 - css->fade_param);
 
 	css->fade_param -= BUTTON_HOVER_SPEED * ctx->dt;
 	css->y_off_t    += BUTTON_HOVER_SPEED * ctx->dt;
