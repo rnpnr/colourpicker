@@ -114,7 +114,7 @@ main(i32 argc, char *argv[])
 	};
 
 	for (u32 i = 0; i < CPM_LAST; i++)
-		ctx.mcs.scales[i] = 1;
+		ctx.mcs.buttons[i].hover_t = 1;
 
 	{
 		v4 rgb = hsv_to_rgb(ctx.colour);
@@ -140,10 +140,10 @@ main(i32 argc, char *argv[])
 				usage(argv[0]);
 			}
 		}
-		ctx.colour = rgb_to_hsv(rgb);
+		ctx.colour          = rgb_to_hsv(rgb);
+		ctx.previous_colour = rgb;
 	}
-	ctx.pms.base_hue    = ctx.colour.x;
-	ctx.previous_colour = hsv_to_rgb(ctx.colour);
+	ctx.pms.base_hue = ctx.colour.x;
 
 	#ifndef _DEBUG
 	SetTraceLogLevel(LOG_NONE);

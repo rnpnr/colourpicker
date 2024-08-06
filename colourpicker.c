@@ -1166,24 +1166,15 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 
 		NPatchInfo tnp = {tr.rr, 0, 0, 0, 0, NPATCH_NINE_PATCH };
 		for (u32 i = 0; i < CPM_LAST; i++) {
-			if (CheckCollisionPointRec(ctx->mouse_pos.rv, mb.rr)) {
-				if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-					if (ctx->mode != i)
-						ctx->mcs.next_mode = i;
-				}
-				ctx->mcs.scales[i] = move_towards_f32(ctx->mcs.scales[i], 1.1,
-				                                      ctx->dt);
-			} else {
-				ctx->mcs.scales[i] = move_towards_f32(ctx->mcs.scales[i], 1,
-				                                      ctx->dt);
+			if (do_button(ctx->mcs.buttons + i, ctx->mouse_pos, mb, ctx->dt, 10)) {
+				if (ctx->mode != i)
+					ctx->mcs.next_mode = i;
 			}
 
-			f32 scaled_dt = 2 * ctx->dt;
-			f32 mvt = ctx->mcs.mode_visible_t;
 			if (ctx->mcs.next_mode != -1) {
-				ctx->mcs.mode_visible_t = move_towards_f32(mvt, 0, scaled_dt);
-				if (ctx->mcs.mode_visible_t == 0) {
-					ctx->mode = ctx->mcs.next_mode;
+				ctx->mcs.mode_visible_t -= 2 * ctx->dt;
+				if (ctx->mcs.mode_visible_t < 0) {
+					ctx->mode          = ctx->mcs.next_mode;
 					ctx->mcs.next_mode = -1;
 					if (ctx->mode == CPM_PICKER) {
 						v4 hsv = get_formatted_colour(ctx, CM_HSV);
@@ -1193,8 +1184,9 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 					ctx->flags |= CPF_REFILL_TEXTURE;
 				}
 			} else {
-				ctx->mcs.mode_visible_t = move_towards_f32(mvt, 1, scaled_dt);
+				ctx->mcs.mode_visible_t += 2 * ctx->dt;
 			}
+			CLAMP01(ctx->mcs.mode_visible_t);
 
 			Texture *texture = NULL;
 			switch (i) {
@@ -1204,7 +1196,7 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 			}
 			ASSERT(texture);
 
-			f32 scale      = ctx->mcs.scales[i];
+			f32 scale      = lerp(1, 1.1, ctx->mcs.buttons[i].hover_t);
 			Rect txt_out   = scale_rect_centered(mb, (v2){.x = 0.8 * scale,
 			                                              .y = 0.8 * scale});
 			Rect outline_r = scale_rect_centered(mb, (v2){.x = scale, .y = scale});

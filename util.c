@@ -130,7 +130,7 @@ typedef struct {
 } StatusBarState;
 
 typedef struct {
-	f32 scales[CPM_LAST];
+	ButtonState buttons[CPM_LAST];
 	f32 mode_visible_t;
 	i32 next_mode;
 } ModeChangeState;
