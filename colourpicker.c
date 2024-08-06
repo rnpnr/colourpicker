@@ -443,13 +443,10 @@ do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_s
 	b32 pressed = do_button(btn, mouse, r, dt, hover_speed);
 
 	f32 param = lerp(1, scale_target, btn->hover_t);
-	v2  scale = {.x = param, .y = param};
-	DrawRectangleRounded(scale_rect_centered(r, scale).rr, SELECTOR_ROUNDNESS, 0,
-	                     fade(SELECTOR_BORDER_COLOUR, fade_t));
-	scale.x *= 0.95;
-	scale.y *= 0.90;
-	DrawRectangleRounded(scale_rect_centered(r, scale).rr, SELECTOR_ROUNDNESS, 0,
-	                     fade(bg, fade_t));
+	Rect sr   = scale_rect_centered(r, (v2){.x = param, .y = param});
+	DrawRectangleRounded(sr.rr, SELECTOR_ROUNDNESS, 0, fade(bg, fade_t));
+	DrawRectangleRoundedLinesEx(sr.rr, SELECTOR_ROUNDNESS, 0, SELECTOR_BORDER_WIDTH,
+	                            fade(SELECTOR_BORDER_COLOUR, fade_t));
 
 	return pressed;
 }
