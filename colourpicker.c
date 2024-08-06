@@ -368,9 +368,11 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 	char saved_c = buf[ctx->is.cursor - buf_delta];
 	buf[ctx->is.cursor - buf_delta] = 0;
 
-	v2 sts           = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
-	f32 cursor_x     = r.pos.x + sts.x;
-	f32 cursor_width = ctx->is.cursor == ctx->is.buf_len ? ctx->window_size.w * 0.03 : ctx->window_size.w * 0.01;
+	v2 sts       = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
+	f32 cursor_x = r.pos.x + sts.x;
+	f32 cursor_width;
+	if (ctx->is.cursor == ctx->is.buf_len) cursor_width = MIN(ctx->window_size.w * 0.03, 20);
+	else                                   cursor_width = MIN(ctx->window_size.w * 0.01, 6);
 
 	buf[ctx->is.cursor - buf_delta] = saved_c;
 
@@ -529,7 +531,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		}
 	}
 
-	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 4 * SLIDER_BORDER_WIDTH, ctx->bg);
+	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 4.85 * SLIDER_BORDER_WIDTH, ctx->bg);
 	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, SLIDER_BORDER_WIDTH,
 	                            SLIDER_BORDER_COLOUR);
 

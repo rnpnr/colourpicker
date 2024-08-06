@@ -192,6 +192,7 @@ typedef struct {
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(*a))
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
+#define MIN(a, b)      ((a) < (b) ? (a) : (b))
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 #define CLAMP01(a)     CLAMP(a, 0, 1)
 
