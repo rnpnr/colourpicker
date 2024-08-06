@@ -1,7 +1,6 @@
 /* See LICENSE for copyright details */
 #include <raylib.h>
 #include <stdio.h>
-#include <string.h> /* memmove */
 
 #include "util.c"
 
@@ -9,6 +8,13 @@ static const char *mode_labels[CM_LAST][4] = {
 	[CM_RGB] = { "R", "G", "B", "A" },
 	[CM_HSV] = { "H", "S", "V", "A" },
 };
+
+static void
+mem_move(char *src, char *dest, size n)
+{
+	if (dest < src) while (n) { *dest++ = *src++; n--; }
+	else            while (n) { n--; dest[n] = src[n]; }
+}
 
 static f32
 move_towards_f32(f32 current, f32 target, f32 delta)
@@ -254,10 +260,11 @@ get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 static void
 parse_and_store_text_input(ColourPickerCtx *ctx)
 {
-
 	v4   new_colour = {0};
 	enum colour_mode new_mode = CM_LAST;
-	if (ctx->is.idx == INPUT_HEX) {
+	if (ctx->is.idx == -1) {
+		return;
+	} else if (ctx->is.idx == INPUT_HEX) {
 		new_colour = normalize_colour(parse_hex_u32(ctx->is.buf));
 		new_mode   = CM_RGB;
 	} else {
@@ -391,10 +398,9 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 			break;
 		}
 
-		/* TODO: remove memmove */
-		memmove(ctx->is.buf + ctx->is.cursor + 1,
-		        ctx->is.buf + ctx->is.cursor,
-		        ctx->is.buf_len - ctx->is.cursor + 1);
+		mem_move(ctx->is.buf + ctx->is.cursor,
+		         ctx->is.buf + ctx->is.cursor + 1,
+		         ctx->is.buf_len - ctx->is.cursor + 1);
 
 		ctx->is.buf[ctx->is.cursor++] = key;
 		ctx->is.buf_len++;
@@ -410,12 +416,11 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
 
 	if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) &&
 	    ctx->is.cursor > 0) {
-		/* TODO: remove memmove */
 		ctx->is.cursor--;
-		memmove(ctx->is.buf + ctx->is.cursor,
-		        ctx->is.buf + ctx->is.cursor + 1,
-			ctx->is.buf_len - ctx->is.cursor - 1);
-		ctx->is.buf[--ctx->is.buf_len] = 0;
+		mem_move(ctx->is.buf + ctx->is.cursor + 1,
+		         ctx->is.buf + ctx->is.cursor,
+		         ctx->is.buf_len - ctx->is.cursor);
+		ctx->is.buf_len--;
 	}
 
 	if (IsKeyPressed(KEY_ENTER)) {
