@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cflags="-march=native -std=c11 -O3 -Wall"
+cflags="-march=native -std=c11 -O3 -Wall -I./external/include"
 ldflags="-lraylib -lm"
 debug=${DEBUG}
 
@@ -26,7 +26,6 @@ else
 		cmake --build   external/raylib/build
 		cmake --install external/raylib/build
 	fi
-	cflags="$cflags -I./external/include"
 	ldflags="-L./external/lib $ldflags"
 fi
 
