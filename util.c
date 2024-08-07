@@ -58,8 +58,8 @@ typedef union {
 } Rect;
 
 enum colour_mode {
-	CM_RGB,
-	CM_HSV,
+	CM_RGB  = 0,
+	CM_HSV  = 1,
 	CM_LAST
 };
 
@@ -90,6 +90,7 @@ enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 #define SLIDER_BORDER_COLOUR   (Color){.r = 0x00, .g = 0x00, .b = 0x00, .a = 0xCC}
 #define SLIDER_BORDER_WIDTH    3.0f
 #define SLIDER_ROUNDNESS       0.5f
+#define SLIDER_BORDER_RADIUS   10.0f
 #define SLIDER_SCALE_SPEED     8.0f
 #define SLIDER_SCALE_TARGET    1.5f
 #define SLIDER_TRI_SIZE        (v2){.x = 6, .y = 8}
@@ -182,8 +183,9 @@ typedef struct {
 	RenderTexture picker_texture;
 	RenderTexture hsv_texture;
 
-	i32    mode_id, hsv_id;
-	i32    offset_id, size_id;
+	i32 colour_mode_id, colours_id;
+	i32 regions_id, size_id;
+	i32 radius_id, border_thick_id;
 
 	u32  flags;
 	enum colour_mode        colour_mode;
