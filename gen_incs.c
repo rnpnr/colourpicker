@@ -32,7 +32,7 @@ read_whole_file(char *name, s8 *mem)
 		exit(1);
 	}
 	res.data = mem->data;
-	res.len  = fread(res.data, res.len, 1, fp);
+	res.len  = fread(res.data, 1, res.len, fp);
 	fclose(fp);
 
 	mem->data += res.len;
@@ -176,7 +176,7 @@ main(void)
 		}
 		if (line.len) {
 			fputc('"', out_file);
-			fwrite(line.data, line.len, 1, out_file);
+			fwrite(line.data, 1, line.len, out_file);
 			fputs("\\n\"\n\t", out_file);
 		}
 	} while (s.len > 0);
