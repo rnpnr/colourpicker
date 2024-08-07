@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
 
@@ -12,7 +13,7 @@
 typedef struct {uint8_t *data; ptrdiff_t len;} s8;
 
 static s8
-read_whole_file(char *name, s8 mem)
+read_whole_file(char *name, s8 *mem)
 {
 	s8 res = {0};
 	FILE *fp = fopen(name, "r");
@@ -26,13 +27,17 @@ read_whole_file(char *name, s8 mem)
 	res.len = ftell(fp);
 	rewind(fp);
 
-	if (mem.len < res.len) {
+	if (mem->len < res.len) {
 		fputs("Not enough space for reading file!\n", stdout);
 		exit(1);
 	}
-	res.data = mem.data;
+	res.data = mem->data;
 	fread(res.data, res.len, 1, fp);
 	fclose(fp);
+
+	mem->data += res.len;
+	mem->len  -= res.len;
+
 	return res;
 }
 
@@ -51,6 +56,90 @@ get_line(s8 *s)
 	return res;
 }
 
+/* NOTE: modified from raylib */
+static void
+export_font_as_code(char *font_path, char *output_name, int font_size, s8 mem)
+{
+	s8 raw            = read_whole_file(font_path, &mem);
+	Font font         = {0};
+	font.baseSize     = font_size;
+	font.glyphCount   = 95;
+	font.glyphPadding = 4;
+
+	font.glyphs = LoadFontData(raw.data, raw.len, font.baseSize, 0, font.glyphCount, FONT_DEFAULT);
+	if (font.glyphs == NULL) {
+		printf("Failed to load font data: %s\n", font_path);
+		exit(1);
+	}
+
+	Image atlas = GenImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize,
+	                                font.glyphPadding, 0);
+
+	FILE *fp = fopen(output_name, "w");
+	if (fp == NULL) {
+		printf("Failed to open output font file: %s\n", output_name);
+		exit(1);
+	}
+
+	char suffix[256];
+	strncpy(suffix, GetFileNameWithoutExt(output_name), 256 - 1);
+
+	#define TEXT_BYTES_PER_LINE 16
+
+	int image_data_size      = GetPixelDataSize(atlas.width, atlas.height, atlas.format);
+	int comp_data_size       = 0;
+	unsigned char *comp_data = CompressData(atlas.data, image_data_size, &comp_data_size);
+
+	// Save font image data (compressed)
+	fprintf(fp, "#define COMPRESSED_DATA_SIZE_FONT_%s %i\n\n", TextToUpper(suffix), comp_data_size);
+	fprintf(fp, "// Font image pixels data compressed (DEFLATE)\n");
+	fprintf(fp, "// NOTE: Original pixel data simplified to GRAYSCALE\n");
+	fprintf(fp, "static unsigned char fontData_%s[COMPRESSED_DATA_SIZE_FONT_%s] = { ", suffix, TextToUpper(suffix));
+	for (int i = 0; i < comp_data_size - 1; i++) fprintf(fp, ((i%TEXT_BYTES_PER_LINE == 0)? "0x%02x,\n    " : "0x%02x, "), comp_data[i]);
+	fprintf(fp, "0x%02x };\n\n", comp_data[comp_data_size - 1]);
+	RL_FREE(comp_data);
+
+	// Save font recs data
+	fprintf(fp, "// Font characters rectangles data\n");
+	fprintf(fp, "static Rectangle fontRecs_%s[%i] = {\n", suffix, font.glyphCount);
+	for (int i = 0; i < font.glyphCount; i++)
+		fprintf(fp, "    { %1.0f, %1.0f, %1.0f , %1.0f },\n", font.recs[i].x, font.recs[i].y, font.recs[i].width, font.recs[i].height);
+	fprintf(fp, "};\n\n");
+
+	// Save font glyphs data
+	// NOTE: Glyphs image data not saved (grayscale pixels), it could be generated from image and recs
+	fprintf(fp, "// Font glyphs info data\n");
+	fprintf(fp, "// NOTE: No glyphs.image data provided\n");
+	fprintf(fp, "static GlyphInfo fontGlyphs_%s[%i] = {\n", suffix, font.glyphCount);
+	for (int i = 0; i < font.glyphCount; i++)
+		fprintf(fp, "    { %i, %i, %i, %i, { 0 }},\n", font.glyphs[i].value, font.glyphs[i].offsetX, font.glyphs[i].offsetY, font.glyphs[i].advanceX);
+	fprintf(fp, "};\n\n");
+
+	// Custom font loading function
+	fprintf(fp, "// Font loading function: %s\n", suffix);
+	fprintf(fp, "static Font LoadFont_%s(void)\n{\n", suffix);
+	fprintf(fp, "    Font font = { 0 };\n\n");
+	fprintf(fp, "    font.baseSize = %i;\n", font.baseSize);
+	fprintf(fp, "    font.glyphCount = %i;\n", font.glyphCount);
+	fprintf(fp, "    font.glyphPadding = %i;\n\n", font.glyphPadding);
+	fprintf(fp, "    // Custom font loading\n");
+	fprintf(fp, "    // NOTE: Compressed font image data (DEFLATE), it requires DecompressData() function\n");
+	fprintf(fp, "    int fontDataSize_%s = 0;\n", suffix);
+	fprintf(fp, "    unsigned char *data = DecompressData(fontData_%s, COMPRESSED_DATA_SIZE_FONT_%s, &fontDataSize_%s);\n", suffix, TextToUpper(suffix), suffix);
+	fprintf(fp, "    Image imFont = { data, %i, %i, 1, %i };\n\n", atlas.width, atlas.height, atlas.format);
+	fprintf(fp, "    // Load texture from image\n");
+	fprintf(fp, "    font.texture = LoadTextureFromImage(imFont);\n");
+	fprintf(fp, "    UnloadImage(imFont);  // Uncompressed data can be unloaded from memory\n\n");
+	fprintf(fp, "    // Assign glyph recs and info data directly\n");
+	fprintf(fp, "    // WARNING: This font data must not be unloaded\n");
+	fprintf(fp, "    font.recs = fontRecs_%s;\n", suffix);
+	fprintf(fp, "    font.glyphs = fontGlyphs_%s;\n\n", suffix);
+	fprintf(fp, "    return font;\n");
+	fprintf(fp, "}\n");
+
+	fclose(fp);
+}
+
 int
 main(void)
 {
@@ -58,15 +147,14 @@ main(void)
 	s8 smem = {.data = mem, .len = sizeof(mem)};
 
 	SetTraceLogLevel(LOG_NONE);
-	{
+	int font_sizes[] = { FONT_SIZE, FONT_SIZE/2 };
+	for (int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
 		s8 tmem = smem;
-		int font_sizes[] = { FONT_SIZE, FONT_SIZE/2 };
-		for (int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
-			snprintf((char *)tmem.data, tmem.len, "lora_sb_%d_inc.h", i);
-			if (!ExportFontAsCodeEx("assets/Lora-SemiBold.ttf", (char *)tmem.data,
-			                        font_sizes[i], 0, 0))
-				printf("Failed to export font: %s\n", (char *)tmem.data);
-		}
+		s8 rmem = smem;
+		size_t tlen  = snprintf((char *)tmem.data, tmem.len, "lora_sb_%d_inc.h", i);
+		rmem.len    -= (tlen + 1);
+		rmem.data   += (tlen + 1);
+		export_font_as_code("assets/Lora-SemiBold.ttf", (char *)tmem.data, font_sizes[i], rmem);
 	}
 
 	FILE *out_file = fopen("external/include/shader_inc.h", "w");
@@ -75,7 +163,7 @@ main(void)
 		return 1;
 	}
 
-	s8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME, smem);
+	s8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME, &smem);
 	s8 s = shader_data;
 	/* NOTE: skip over license notice */
 	s8 line = get_line(&s);

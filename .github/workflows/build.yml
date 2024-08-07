@@ -17,10 +17,6 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get install libxkbcommon-dev xorg-dev libwayland-dev ninja-build
-      - name: Configure Git
-        run: |
-          git config --global user.email "fu@githubci.com"
-          git config --global user.name "F U"
       - uses: actions/checkout@v4
       - name: Build
         run: ./build.sh
@@ -45,12 +41,6 @@ jobs:
           update: true
           install: git mingw-w64-${{matrix.env}}-${{matrix.cc}}
           pacboy: ninja:p cmake:p
-
-      - name: Configure Git
-        run: |
-          git config --global user.email "fu@githubci.com"
-          git config --global user.name "F U"
-
       - uses: actions/checkout@v4
       - name: Build
         run: ./build.sh
