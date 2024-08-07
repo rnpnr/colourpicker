@@ -8,7 +8,7 @@ cc=${CC:-cc}
 system_raylib=${USE_SYSTEM_RAYLIB:-$debug}
 
 case $(uname -s) in
-MINGW64*) ldflags="$ldflags -lgdi32 -lwinmm" ;;
+MINGW64*) ldflags="$ldflags -mwindows -lgdi32 -lwinmm" ;;
 esac
 
 # NOTE: clones and builds a static raylib if system lib is not requested
