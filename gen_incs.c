@@ -32,7 +32,7 @@ read_whole_file(char *name, s8 *mem)
 		exit(1);
 	}
 	res.data = mem->data;
-	fread(res.data, res.len, 1, fp);
+	res.len  = fread(res.data, res.len, 1, fp);
 	fclose(fp);
 
 	mem->data += res.len;
