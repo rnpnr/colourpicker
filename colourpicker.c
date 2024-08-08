@@ -288,20 +288,12 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 }
 
 static void
-do_text_input(ColourPickerCtx *ctx, Rect r, Color colour)
+do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 {
-	static i32 max_chars[INPUT_A + 1] = {
-		[INPUT_HEX] = 8,
-		[INPUT_R]   = 4,
-		[INPUT_B]   = 4,
-		[INPUT_G]   = 4,
-		[INPUT_A]   = 4,
-	};
-
 	v2 ts  = {.rv = MeasureTextEx(ctx->font, ctx->is.buf, ctx->font_size, 0)};
 	v2 pos = {.x = r.pos.x, .y = r.pos.y + (r.size.y - ts.y) / 2};
 
-	i32 buf_delta = ctx->is.buf_len - max_chars[ctx->is.idx];
+	i32 buf_delta = ctx->is.buf_len - max_disp_chars;
 	if (buf_delta < 0) buf_delta = 0;
 	char *buf     = ctx->is.buf + buf_delta;
 	{
@@ -515,7 +507,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 			fpos = left_align_text_in_rect(vr, value, ctx->font, ctx->font_size);
 			DrawTextEx(ctx->font, value, fpos.rv, ctx->font_size, 0, colour_rl);
 		} else {
-			do_text_input(ctx, vr, colour_rl);
+			do_text_input(ctx, vr, colour_rl, 4);
 		}
 	}
 
@@ -600,7 +592,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 		fpos = left_align_text_in_rect(hex_r, hex, ctx->font, ctx->font_size);
 		DrawTextEx(ctx->font, hex, fpos.rv, ctx->font_size, 0, hex_colour_rl);
 	} else {
-		do_text_input(ctx, hex_r, hex_colour_rl);
+		do_text_input(ctx, hex_r, hex_colour_rl, 8);
 	}
 
 	DrawTextEx(ctx->font, mode_txt, mode_r.pos.rv, ctx->font_size, 0,
