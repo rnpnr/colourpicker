@@ -1,5 +1,6 @@
 /* See LICENSE for copyright details */
 #include <raylib.h>
+#include <rlgl.h>
 #include <stdio.h>
 
 #include "util.c"
@@ -778,17 +779,14 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_origin)
 		i32 cm_mode      = ctx->colour_mode;
 		i32 mode         = ctx->mode;
 
-		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
-		SetShaderValue(ctx->picker_shader, ctx->radius_id, &radius, SHADER_UNIFORM_FLOAT);
-		SetShaderValue(ctx->picker_shader, ctx->border_thick_id, &border_thick,
-		               SHADER_UNIFORM_FLOAT);
-		SetShaderValue(ctx->picker_shader, ctx->colour_mode_id, &cm_mode,
-		               SHADER_UNIFORM_INT);
-		SetShaderValue(ctx->picker_shader, ctx->size_id, tr.size.E, SHADER_UNIFORM_VEC2);
-		SetShaderValue(ctx->picker_shader, ctx->colours_id, ctx->colour.E,
-		               SHADER_UNIFORM_VEC4);
-		SetShaderValueV(ctx->picker_shader, ctx->regions_id, regions,
-		                SHADER_UNIFORM_VEC4, 4);
+		rlEnableShader(ctx->picker_shader.id);
+		rlSetUniform(ctx->mode_id,         &mode,         RL_SHADER_UNIFORM_INT,   1);
+		rlSetUniform(ctx->radius_id,       &radius,       RL_SHADER_UNIFORM_FLOAT, 1);
+		rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
+		rlSetUniform(ctx->colour_mode_id,  &cm_mode,      RL_SHADER_UNIFORM_INT,   1);
+		rlSetUniform(ctx->size_id,         tr.size.E,     RL_SHADER_UNIFORM_VEC2,  1);
+		rlSetUniform(ctx->colours_id,      ctx->colour.E, RL_SHADER_UNIFORM_VEC4,  1);
+		rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  4);
 		DrawRectangleRec(tr.rr, BLACK);
 	}
 	EndShaderMode();
@@ -903,17 +901,14 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 		i32 cm_mode      = CM_HSV;
 		i32 mode         = ctx->mode;
 
-		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
-		SetShaderValue(ctx->picker_shader, ctx->radius_id, &radius, SHADER_UNIFORM_FLOAT);
-		SetShaderValue(ctx->picker_shader, ctx->border_thick_id, &border_thick,
-		               SHADER_UNIFORM_FLOAT);
-		SetShaderValue(ctx->picker_shader, ctx->colour_mode_id, &cm_mode,
-		               SHADER_UNIFORM_INT);
-		SetShaderValue(ctx->picker_shader, ctx->size_id, tr.size.E, SHADER_UNIFORM_VEC2);
-		SetShaderValueV(ctx->picker_shader, ctx->colours_id, (f32 *)hsv,
-		                SHADER_UNIFORM_VEC4, 3);
-		SetShaderValueV(ctx->picker_shader, ctx->regions_id, regions,
-		                SHADER_UNIFORM_VEC4, 3);
+		rlEnableShader(ctx->picker_shader.id);
+		rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
+		rlSetUniform(ctx->colour_mode_id,  &cm_mode,      RL_SHADER_UNIFORM_INT,   1);
+		rlSetUniform(ctx->colours_id,      (f32 *)hsv,    RL_SHADER_UNIFORM_VEC4,  3);
+		rlSetUniform(ctx->mode_id,         &mode,         RL_SHADER_UNIFORM_INT,   1);
+		rlSetUniform(ctx->radius_id,       &radius,       RL_SHADER_UNIFORM_FLOAT, 1);
+		rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  3);
+		rlSetUniform(ctx->size_id,         tr.size.E,     RL_SHADER_UNIFORM_VEC2,  1);
 		DrawRectangleRec(tr.rr, BLACK);
 	}
 	EndShaderMode();
