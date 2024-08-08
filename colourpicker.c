@@ -734,6 +734,25 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 }
 
 static void
+do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f32 *colours)
+{
+	f32 border_thick = SLIDER_BORDER_WIDTH;
+	f32 radius       = SLIDER_BORDER_RADIUS;
+
+	BeginShaderMode(ctx->picker_shader);
+	rlEnableShader(ctx->picker_shader.id);
+	rlSetUniform(ctx->mode_id,         &ctx->mode,    RL_SHADER_UNIFORM_INT,   1);
+	rlSetUniform(ctx->radius_id,       &radius,       RL_SHADER_UNIFORM_FLOAT, 1);
+	rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
+	rlSetUniform(ctx->colour_mode_id,  &colour_mode,  RL_SHADER_UNIFORM_INT,   1);
+	rlSetUniform(ctx->size_id,         r.size.E,      RL_SHADER_UNIFORM_VEC2,  1);
+	rlSetUniform(ctx->colours_id,      colours,       RL_SHADER_UNIFORM_VEC4,  4);
+	rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  4);
+	DrawRectangleRec(r.rr, BLACK);
+	EndShaderMode();
+}
+
+static void
 do_slider_mode(ColourPickerCtx *ctx, v2 relative_origin)
 {
 	Rect tr  = {
@@ -763,33 +782,16 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_origin)
 		ss.pos.y += y_step;
 	}
 
-	BeginShaderMode(ctx->picker_shader);
-	{
-		f32 start_y = sr.pos.y - 0.5 * ss.size.h;
-		f32 end_y   = start_y + sr.size.h;
-		f32 regions[] = {
-			sr.pos.x, start_y + 3 * y_step, r_bound, end_y + 3 * y_step,
-			sr.pos.x, start_y + 2 * y_step, r_bound, end_y + 2 * y_step,
-			sr.pos.x, start_y + 1 * y_step, r_bound, end_y + 1 * y_step,
-			sr.pos.x, start_y + 0 * y_step, r_bound, end_y + 0 * y_step
-		};
-
-		f32 radius       = SLIDER_BORDER_RADIUS;
-		f32 border_thick = SLIDER_BORDER_WIDTH;
-		i32 cm_mode      = ctx->colour_mode;
-		i32 mode         = ctx->mode;
-
-		rlEnableShader(ctx->picker_shader.id);
-		rlSetUniform(ctx->mode_id,         &mode,         RL_SHADER_UNIFORM_INT,   1);
-		rlSetUniform(ctx->radius_id,       &radius,       RL_SHADER_UNIFORM_FLOAT, 1);
-		rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
-		rlSetUniform(ctx->colour_mode_id,  &cm_mode,      RL_SHADER_UNIFORM_INT,   1);
-		rlSetUniform(ctx->size_id,         tr.size.E,     RL_SHADER_UNIFORM_VEC2,  1);
-		rlSetUniform(ctx->colours_id,      ctx->colour.E, RL_SHADER_UNIFORM_VEC4,  1);
-		rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  4);
-		DrawRectangleRec(tr.rr, BLACK);
-	}
-	EndShaderMode();
+	f32 start_y = sr.pos.y - 0.5 * ss.size.h;
+	f32 end_y   = start_y + sr.size.h;
+	f32 regions[16] = {
+		sr.pos.x, start_y + 3 * y_step, r_bound, end_y + 3 * y_step,
+		sr.pos.x, start_y + 2 * y_step, r_bound, end_y + 2 * y_step,
+		sr.pos.x, start_y + 1 * y_step, r_bound, end_y + 1 * y_step,
+		sr.pos.x, start_y + 0 * y_step, r_bound, end_y + 0 * y_step
+	};
+	v4 colours[3] = {ctx->colour};
+	do_slider_shader(ctx, tr, ctx->colour_mode, regions, (f32 *)colours);
 
 	EndTextureMode();
 }
@@ -889,29 +891,14 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 	colour = do_vertical_slider(ctx, test_pos, hs2, PM_MIDDLE, hsv[2], hsv[1], colour);
 	ctx->pms.fractional_hue = colour.x - ctx->pms.base_hue;
 
-	BeginShaderMode(ctx->picker_shader);
 	{
-		f32 regions[] = {
+		f32 regions[16] = {
 			hs1.pos.x, hs1.pos.y, hs1.pos.x + hs1.size.w, hs1.pos.y + hs1.size.h,
 			hs2.pos.x, hs2.pos.y, hs2.pos.x + hs2.size.w, hs2.pos.y + hs2.size.h,
 			sv.pos.x,  sv.pos.y,  sv.pos.x  + sv.size.w,  sv.pos.y  + sv.size.h
 		};
-		f32 radius       = SLIDER_BORDER_RADIUS;
-		f32 border_thick = SLIDER_BORDER_WIDTH;
-		i32 cm_mode      = CM_HSV;
-		i32 mode         = ctx->mode;
-
-		rlEnableShader(ctx->picker_shader.id);
-		rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
-		rlSetUniform(ctx->colour_mode_id,  &cm_mode,      RL_SHADER_UNIFORM_INT,   1);
-		rlSetUniform(ctx->colours_id,      (f32 *)hsv,    RL_SHADER_UNIFORM_VEC4,  3);
-		rlSetUniform(ctx->mode_id,         &mode,         RL_SHADER_UNIFORM_INT,   1);
-		rlSetUniform(ctx->radius_id,       &radius,       RL_SHADER_UNIFORM_FLOAT, 1);
-		rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  3);
-		rlSetUniform(ctx->size_id,         tr.size.E,     RL_SHADER_UNIFORM_VEC2,  1);
-		DrawRectangleRec(tr.rr, BLACK);
+		do_slider_shader(ctx, tr, CM_HSV, regions, (f32 *)hsv);
 	}
-	EndShaderMode();
 
 	b32 hovering = CheckCollisionPointRec(test_pos.rv, sv.rr);
 	if (hovering && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && ctx->held_idx == -1)
