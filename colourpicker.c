@@ -390,23 +390,25 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 	}
 }
 
-static b32
+static i32
 do_button(ButtonState *btn, v2 mouse, Rect r, f32 dt, f32 hover_speed)
 {
-	b32 hovered = CheckCollisionPointRec(mouse.rv, r.rr);
-	b32 pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+	b32 hovered       = CheckCollisionPointRec(mouse.rv, r.rr);
+	i32 pressed_mask  = 0;
+	pressed_mask     |= MOUSE_LEFT  * (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
+	pressed_mask     |= MOUSE_RIGHT * (hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT));
 
 	if (hovered) btn->hover_t += hover_speed * dt;
 	else         btn->hover_t -= hover_speed * dt;
 	CLAMP01(btn->hover_t);
 
-	return pressed;
+	return pressed_mask;
 }
 
-static b32
+static i32
 do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_speed, f32 scale_target, f32 fade_t)
 {
-	b32 pressed = do_button(btn, mouse, r, dt, hover_speed);
+	i32 pressed_mask = do_button(btn, mouse, r, dt, hover_speed);
 
 	f32 param = lerp(1, scale_target, btn->hover_t);
 	Rect sr   = scale_rect_centered(r, (v2){.x = param, .y = param});
@@ -414,13 +416,13 @@ do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_s
 	DrawRectangleRoundedLinesEx(sr.rr, SELECTOR_ROUNDNESS, 0, SELECTOR_BORDER_WIDTH,
 	                            fade(SELECTOR_BORDER_COLOUR, fade_t));
 
-	return pressed;
+	return pressed_mask;
 }
 
-static b32
+static i32
 do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *text, v4 fg, Color bg)
 {
-	b32 pressed = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
+	i32 pressed_mask = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
 
 	v2 tpos   = center_align_text_in_rect(r, text, ctx->font, ctx->font_size);
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
@@ -429,7 +431,7 @@ do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *t
 	DrawTextEx(ctx->font, text, spos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
 	DrawTextEx(ctx->font, text, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
 
-	return pressed;
+	return pressed_mask;
 }
 
 static void
@@ -536,13 +538,10 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 	v2 test_pos  = ctx->mouse_pos;
 	test_pos.x  -= relative_origin.x;
 	test_pos.y  -= relative_origin.y;
-	b32 mode_collides = CheckCollisionPointRec(test_pos.rv, mode_r.rr);
-	if (mode_collides) {
-		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-			step_colour_mode(ctx, 1);
-		if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
-			step_colour_mode(ctx, -1);
-	}
+
+	i32 mouse_mask = do_button(&ctx->sbs.mode, test_pos, mode_r, ctx->dt, TEXT_HOVER_SPEED);
+	if (mouse_mask & MOUSE_LEFT)  step_colour_mode(ctx, 1);
+	if (mouse_mask & MOUSE_RIGHT) step_colour_mode(ctx, -1);
 
 	Color hc          = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
 	const char *hex   = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
@@ -573,16 +572,11 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_origin)
 		ctx->sbs.hex_hover_t += TEXT_HOVER_SPEED * ctx->dt;
 	else
 		ctx->sbs.hex_hover_t -= TEXT_HOVER_SPEED * ctx->dt;
-
-	if (mode_collides) ctx->sbs.mode_hover_t += TEXT_HOVER_SPEED * ctx->dt;
-	else               ctx->sbs.mode_hover_t -= TEXT_HOVER_SPEED * ctx->dt;
-
 	CLAMP01(ctx->sbs.hex_hover_t);
-	CLAMP01(ctx->sbs.mode_hover_t);
 
 	v4 fg          = normalize_colour(pack_rl_colour(ctx->fg));
 	v4 hex_colour  = lerp_v4(fg, ctx->hover_colour, ctx->sbs.hex_hover_t);
-	v4 mode_colour = lerp_v4(fg, ctx->hover_colour, ctx->sbs.mode_hover_t);
+	v4 mode_colour = lerp_v4(fg, ctx->hover_colour, ctx->sbs.mode.hover_t);
 
 	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
 	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);

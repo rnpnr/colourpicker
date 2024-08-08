@@ -81,6 +81,12 @@ enum input_indices {
 	INPUT_A
 };
 
+enum mouse_pressed {
+	MOUSE_NONE   = 0 << 0,
+	MOUSE_LEFT   = 1 << 0,
+	MOUSE_RIGHT  = 1 << 1,
+};
+
 enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
 #define WINDOW_ASPECT_RATIO    (4.3f/3.2f)
@@ -127,7 +133,7 @@ typedef struct {
 
 typedef struct {
 	f32 hex_hover_t;
-	f32 mode_hover_t;
+	ButtonState mode;
 } StatusBarState;
 
 typedef struct {
