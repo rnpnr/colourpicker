@@ -214,38 +214,6 @@ step_colour_mode(ColourPickerCtx *ctx, i32 inc)
 }
 
 static void
-fill_hsv_texture(RenderTexture texture, v4 hsv, Color bg)
-{
-	f32 line_length = (f32)texture.texture.height / 3;
-	v2 vtop = {0};
-	v2 vbot = { .y = vtop.y + line_length };
-	v2 sbot = { .y = vbot.y + line_length };
-	v2 hbot = { .y = sbot.y + line_length };
-
-	v4 h = hsv, s = hsv, v = hsv;
-	h.x = 0;
-	s.y = 0;
-	v.z = 0;
-
-	f32 inc = 1.0 / texture.texture.width;
-	BeginTextureMode(texture);
-		ClearBackground(bg);
-		for (u32 i = 0; i < texture.texture.width; i++) {
-			DrawLineV(sbot.rv, hbot.rv, colour_from_normalized(hsv_to_rgb(h)));
-			DrawLineV(vbot.rv, sbot.rv, colour_from_normalized(hsv_to_rgb(s)));
-			DrawLineV(vtop.rv, vbot.rv, colour_from_normalized(hsv_to_rgb(v)));
-			hbot.x += 1.0;
-			sbot.x += 1.0;
-			vtop.x += 1.0;
-			vbot.x += 1.0;
-			h.x    += inc;
-			s.y    += inc;
-			v.z    += inc;
-		}
-	EndTextureMode();
-}
-
-static void
 get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 {
 	if (label) *label = cut_rect_left(r, 0.08);
@@ -500,42 +468,6 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_origin)
 		ctx->held_idx = -1;
 
 	f32 current = ctx->colour.E[label_idx];
-	Rect srl = cut_rect_left(sr, current);
-	Rect srr = cut_rect_right(sr, current);
-
-	/* TODO: this should probably be a switch */
-	if (ctx->colour_mode == CM_RGB) {
-		Color sel, left, right;
-		v4 cl     = ctx->colour;
-		v4 cr     = ctx->colour;
-		cl.E[label_idx] = 0;
-		cr.E[label_idx] = 1;
-		left      = colour_from_normalized(cl);
-		right     = colour_from_normalized(cr);
-		sel       = colour_from_normalized(ctx->colour);
-		DrawRectangleGradientEx(srl.rr, left, left, sel, sel);
-		DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
-	} else {
-		if (label_idx == 3) { /* Alpha */
-			Color sel   = colour_from_normalized(hsv_to_rgb(ctx->colour));
-			Color left  = sel;
-			Color right = sel;
-			left.a  = 0;
-			right.a = 255;
-			DrawRectangleGradientEx(srl.rr, left, left, sel, sel);
-			DrawRectangleGradientEx(srr.rr, sel, sel, right, right);
-		} else {
-			Rect tr    = {0};
-			tr.pos.y  += ctx->hsv_texture.texture.height / 3 * label_idx;
-			tr.size.h  = sr.size.h;
-			tr.size.w  = ctx->hsv_texture.texture.width;
-			DrawTexturePro(ctx->hsv_texture.texture, tr.rr, sr.rr, (Vector2){0}, 0, WHITE);
-		}
-	}
-
-	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, 4.85 * SLIDER_BORDER_WIDTH, ctx->bg);
-	DrawRectangleRoundedLinesEx(sr.rr, SLIDER_ROUNDNESS, 0, SLIDER_BORDER_WIDTH,
-	                            SLIDER_BORDER_COLOUR);
 
 	{
 		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0) * SLIDER_SCALE_SPEED * ctx->dt;
@@ -811,35 +743,55 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_origin)
 	};
 	Rect sb    = tr;
 	Rect ss    = tr;
+	sb.size.h *= 0.1;
 	ss.size.h *= 0.15;
-
-	if (ctx->flags & CPF_REFILL_TEXTURE) {
-		Rect sr;
-		get_slider_subrects(ss, 0, &sr, 0);
-		if (ctx->hsv_texture.texture.width != (i32)(sr.size.w + 0.5)) {
-			i32 w = sr.size.w + 0.5;
-			i32 h = sr.size.h * 3;
-			h += 3 - (h % 3);
-			UnloadRenderTexture(ctx->hsv_texture);
-			ctx->hsv_texture = LoadRenderTexture(w, h);
-		}
-		fill_hsv_texture(ctx->hsv_texture, get_formatted_colour(ctx, CM_HSV), ctx->bg);
-		ctx->flags &= ~CPF_REFILL_TEXTURE;
-	}
+	ss.pos.y  += 1.2 * sb.size.h;
 
 	BeginTextureMode(ctx->slider_texture);
 	ClearBackground(ctx->bg);
 
-	sb.size.h *= 0.1;
 	do_status_bar(ctx, sb, relative_origin);
 
-	ss.pos.y   += 1.2 * sb.size.h;
-	f32 y_pad  = 0.525 * ss.size.h;
+	Rect sr;
+	get_slider_subrects(ss, 0, &sr, 0);
+	f32 r_bound = sr.pos.x + sr.size.w;
+	f32 y_step  = 1.525 * ss.size.h;
 
 	for (i32 i = 0; i < 4; i++) {
 		do_slider(ctx, ss, i, relative_origin);
-		ss.pos.y += ss.size.h + y_pad;
+		ss.pos.y += y_step;
 	}
+
+	BeginShaderMode(ctx->picker_shader);
+	{
+		f32 start_y = sr.pos.y - 0.5 * ss.size.h;
+		f32 end_y   = start_y + sr.size.h;
+		f32 regions[] = {
+			sr.pos.x, start_y + 3 * y_step, r_bound, end_y + 3 * y_step,
+			sr.pos.x, start_y + 2 * y_step, r_bound, end_y + 2 * y_step,
+			sr.pos.x, start_y + 1 * y_step, r_bound, end_y + 1 * y_step,
+			sr.pos.x, start_y + 0 * y_step, r_bound, end_y + 0 * y_step
+		};
+
+		f32 radius       = SLIDER_BORDER_RADIUS;
+		f32 border_thick = SLIDER_BORDER_WIDTH;
+		i32 cm_mode      = ctx->colour_mode;
+		i32 mode         = ctx->mode;
+
+		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
+		SetShaderValue(ctx->picker_shader, ctx->radius_id, &radius, SHADER_UNIFORM_FLOAT);
+		SetShaderValue(ctx->picker_shader, ctx->border_thick_id, &border_thick,
+		               SHADER_UNIFORM_FLOAT);
+		SetShaderValue(ctx->picker_shader, ctx->colour_mode_id, &cm_mode,
+		               SHADER_UNIFORM_INT);
+		SetShaderValue(ctx->picker_shader, ctx->size_id, tr.size.E, SHADER_UNIFORM_VEC2);
+		SetShaderValue(ctx->picker_shader, ctx->colours_id, ctx->colour.E,
+		               SHADER_UNIFORM_VEC4);
+		SetShaderValueV(ctx->picker_shader, ctx->regions_id, regions,
+		                SHADER_UNIFORM_VEC4, 4);
+		DrawRectangleRec(tr.rr, BLACK);
+	}
+	EndShaderMode();
 
 	EndTextureMode();
 }
@@ -895,20 +847,6 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 static void
 do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 {
-	if (!IsShaderReady(ctx->picker_shader)) {
-#ifdef _DEBUG
-		ctx->picker_shader   = LoadShader(0, HSV_LERP_SHADER_NAME);
-#else
-		ctx->picker_shader   = LoadShaderFromMemory(0, g_hsv_shader_text);
-#endif
-		ctx->colour_mode_id  = GetShaderLocation(ctx->picker_shader, "u_colour_mode");
-		ctx->colours_id      = GetShaderLocation(ctx->picker_shader, "u_colours");
-		ctx->regions_id      = GetShaderLocation(ctx->picker_shader, "u_regions");
-		ctx->size_id         = GetShaderLocation(ctx->picker_shader, "u_size");
-		ctx->radius_id       = GetShaderLocation(ctx->picker_shader, "u_radius");
-		ctx->border_thick_id = GetShaderLocation(ctx->picker_shader, "u_border_thick");
-	}
-
 	v4 colour = get_formatted_colour(ctx, CM_HSV);
 	colour.x  = ctx->pms.base_hue + ctx->pms.fractional_hue;
 
@@ -928,6 +866,7 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 	test_pos.y  -= relative_origin.y;
 
 	BeginTextureMode(ctx->picker_texture);
+	ClearBackground(ctx->bg);
 
 	v4 hsv[3] = {colour, colour, colour};
 	hsv[1].x = 0;
@@ -952,7 +891,6 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 	colour = do_vertical_slider(ctx, test_pos, hs2, PM_MIDDLE, hsv[2], hsv[1], colour);
 	ctx->pms.fractional_hue = colour.x - ctx->pms.base_hue;
 
-	ClearBackground(ctx->bg);
 	BeginShaderMode(ctx->picker_shader);
 	{
 		f32 regions[] = {
@@ -963,7 +901,9 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_origin)
 		f32 radius       = SLIDER_BORDER_RADIUS;
 		f32 border_thick = SLIDER_BORDER_WIDTH;
 		i32 cm_mode      = CM_HSV;
+		i32 mode         = ctx->mode;
 
+		SetShaderValue(ctx->picker_shader, ctx->mode_id, &mode, SHADER_UNIFORM_INT);
 		SetShaderValue(ctx->picker_shader, ctx->radius_id, &radius, SHADER_UNIFORM_FLOAT);
 		SetShaderValue(ctx->picker_shader, ctx->border_thick_id, &border_thick,
 		               SHADER_UNIFORM_FLOAT);
@@ -1045,15 +985,29 @@ DEBUG_EXPORT void
 do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse_pos)
 {
 	if (IsWindowResized()) {
-		ctx->window_size.h  = GetScreenHeight();
-		ctx->window_size.w  = ctx->window_size.h / WINDOW_ASPECT_RATIO;
-		ctx->flags         |= CPF_REFILL_TEXTURE;
+		ctx->window_size.h = GetScreenHeight();
+		ctx->window_size.w = ctx->window_size.h / WINDOW_ASPECT_RATIO;
 		SetWindowSize(ctx->window_size.w, ctx->window_size.h);
 
 		UnloadTexture(ctx->font.texture);
 		if (ctx->window_size.w < 480) ctx->font = LoadFont_lora_sb_1_inc();
 		else                          ctx->font = LoadFont_lora_sb_0_inc();
 		ctx->font_size = ctx->font.baseSize;
+	}
+
+	if (!IsShaderReady(ctx->picker_shader)) {
+#ifdef _DEBUG
+		ctx->picker_shader   = LoadShader(0, HSV_LERP_SHADER_NAME);
+#else
+		ctx->picker_shader   = LoadShaderFromMemory(0, g_hsv_shader_text);
+#endif
+		ctx->mode_id         = GetShaderLocation(ctx->picker_shader, "u_mode");
+		ctx->colour_mode_id  = GetShaderLocation(ctx->picker_shader, "u_colour_mode");
+		ctx->colours_id      = GetShaderLocation(ctx->picker_shader, "u_colours");
+		ctx->regions_id      = GetShaderLocation(ctx->picker_shader, "u_regions");
+		ctx->size_id         = GetShaderLocation(ctx->picker_shader, "u_size");
+		ctx->radius_id       = GetShaderLocation(ctx->picker_shader, "u_radius");
+		ctx->border_thick_id = GetShaderLocation(ctx->picker_shader, "u_border_thick");
 	}
 
 	ctx->dt            = dt;
@@ -1084,8 +1038,12 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 			i32 h = ma.size.h;
 			UnloadRenderTexture(ctx->picker_texture);
 			ctx->picker_texture = LoadRenderTexture(w, h);
-			if (ctx->mode != CPM_PICKER)
+			if (ctx->mode != CPM_PICKER) {
+				i32 mode  = ctx->mode;
+				ctx->mode = CPM_PICKER;
 				do_picker_mode(ctx, ma.pos);
+				ctx->mode = mode;
+			}
 		}
 
 		if (ctx->slider_texture.texture.width != (i32)(ma.size.w)) {
@@ -1093,8 +1051,12 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 			i32 h = ma.size.h;
 			UnloadRenderTexture(ctx->slider_texture);
 			ctx->slider_texture = LoadRenderTexture(w, h);
-			if (ctx->mode != CPM_SLIDERS)
+			if (ctx->mode != CPM_SLIDERS) {
+				i32 mode  = ctx->mode;
+				ctx->mode = CPM_SLIDERS;
 				do_slider_mode(ctx, ma.pos);
+				ctx->mode = mode;
+			}
 		}
 	}
 

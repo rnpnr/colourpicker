@@ -1,6 +1,6 @@
 /* NOTE: This is used by gen_incs for generating font_inc.h and shader_inc.h */
 #define FONT_SIZE            40u
-#define HSV_LERP_SHADER_NAME "hsv_lerp.glsl"
+#define HSV_LERP_SHADER_NAME "slider_lerp.glsl"
 
 /* NOTE: Values below here are just used for initializing the ctx in main.
  * They are not needed if you are are embedding into another application. */

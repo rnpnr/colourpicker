@@ -30,7 +30,7 @@ fi
 
 [ ! -s "config.h" ] && cp config.def.h config.h
 
-if [ ! -e "external/include/shader_inc.h" ] || [ "hsv_lerp.glsl" -nt "external/include/shader_inc.h" ]; then
+if [ ! -e "external/include/shader_inc.h" ] || [ "slider_lerp.glsl" -nt "external/include/shader_inc.h" ]; then
 	${cc} $cflags -o gen_incs gen_incs.c $ldflags
 	./gen_incs
 	mv lora_sb*.h external/include/

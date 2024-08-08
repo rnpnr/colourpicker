@@ -64,8 +64,8 @@ enum colour_mode {
 };
 
 enum colour_picker_mode {
-	CPM_PICKER,
-	CPM_SLIDERS,
+	CPM_PICKER   = 0,
+	CPM_SLIDERS  = 1,
 	CPM_LAST
 };
 
@@ -181,9 +181,8 @@ typedef struct {
 	Shader picker_shader;
 	RenderTexture slider_texture;
 	RenderTexture picker_texture;
-	RenderTexture hsv_texture;
 
-	i32 colour_mode_id, colours_id;
+	i32 mode_id, colour_mode_id, colours_id;
 	i32 regions_id, size_id;
 	i32 radius_id, border_thick_id;
 
