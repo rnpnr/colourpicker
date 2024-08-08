@@ -746,7 +746,7 @@ do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f3
 	rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
 	rlSetUniform(ctx->colour_mode_id,  &colour_mode,  RL_SHADER_UNIFORM_INT,   1);
 	rlSetUniform(ctx->size_id,         r.size.E,      RL_SHADER_UNIFORM_VEC2,  1);
-	rlSetUniform(ctx->colours_id,      colours,       RL_SHADER_UNIFORM_VEC4,  4);
+	rlSetUniform(ctx->colours_id,      colours,       RL_SHADER_UNIFORM_VEC4,  3);
 	rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  4);
 	DrawRectangleRec(r.rr, BLACK);
 	EndShaderMode();
