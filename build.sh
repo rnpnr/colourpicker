@@ -1,7 +1,10 @@
 #!/bin/sh
 
-cflags="-march=native -std=c11 -O3 -Wall -I./external/include"
-ldflags="-lraylib -lm"
+cflags=${CFLAGS:-"-march=native -O3 -Wall"}
+cflags="${cflags} -std=c11 -I./external/include"
+ldflags=${LDFLAGS:-"-flto"}
+ldflags="$ldflags -lraylib -lm"
+
 debug=${DEBUG}
 
 cc=${CC:-cc}
