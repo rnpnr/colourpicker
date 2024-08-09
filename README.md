@@ -2,6 +2,8 @@
 
 A basic colour picker written in C and [raylib][].
 
+![example screenshot](assets/ex.png)
+
 ## Requirements
 * C11 Compiler
 * [raylib][] - Optional, a static version will be built if `USE_SYSTEM_RAYLIB`
