@@ -152,8 +152,24 @@ main(i32 argc, char *argv[])
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(ctx.window_size.w, ctx.window_size.h, "Colour Picker");
 	/* NOTE: do this after initing so that the window starts out floating in tiling wm */
-	SetWindowMinSize(320, 320 * WINDOW_ASPECT_RATIO);
+	SetWindowMinSize(324, 324 * WINDOW_ASPECT_RATIO);
 	SetWindowState(FLAG_WINDOW_RESIZABLE);
+
+	{
+		Image icon;
+		RenderTexture icon_texture = LoadRenderTexture(48, 48);
+		BeginDrawing();
+		BeginTextureMode(icon_texture);
+		ClearBackground(ctx.bg);
+		DrawCircleGradient(24, 24, 16, colour_from_normalized(hsv_to_rgb(ctx.colour)), ctx.bg);
+		DrawRing((Vector2){24, 24}, 13, 16, 0, 360, 32, BLACK);
+		EndTextureMode();
+		EndDrawing();
+		icon = LoadImageFromTexture(icon_texture.texture);
+		SetWindowIcon(icon);
+		UnloadRenderTexture(icon_texture);
+		UnloadImage(icon);
+	}
 
 	ctx.font      = LoadFont_lora_sb_0_inc();
 	ctx.font_size = ctx.font.baseSize;
