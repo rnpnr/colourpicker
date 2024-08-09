@@ -802,17 +802,13 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 
 	f32 param = (colour.x - top_colour.x) / (bot_colour.x - top_colour.x);
 	{
-		/* TODO: move this to ctx */
-		static f32 slider_scale[2] = { 1, 1 };
-		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0f) * SLIDER_SCALE_SPEED * ctx->dt;
-
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && ctx->held_idx == idx);
-		f32 scale = slider_scale[idx];
-		scale     = move_towards_f32(scale, should_scale? SLIDER_SCALE_TARGET : 1.0,
-		                             scale_delta);
-		slider_scale[idx] = scale;
+		if (should_scale) ctx->pms.scale_t[idx] += SLIDER_SCALE_SPEED * ctx->dt;
+		else              ctx->pms.scale_t[idx] -= SLIDER_SCALE_SPEED * ctx->dt;
+		CLAMP01(ctx->pms.scale_t[idx]);
 
+		f32 scale    = lerp(1, SLIDER_SCALE_TARGET, ctx->pms.scale_t[idx]);
 		v2 tri_scale = {.x = scale, .y = scale};
 		v2 tri_mid   = {.x = r.pos.x, .y = r.pos.y + (param * r.size.h)};
 		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, EAST, ctx->fg);
@@ -889,16 +885,16 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 	f32 radius = 4;
 	v2  param  = {.x = colour.y, .y = 1 - colour.z};
 	{
-		/* TODO: move this to ctx */
-		static f32 slider_scale = 1;
-		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0) * SLIDER_SCALE_SPEED * ctx->dt;
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && ctx->held_idx == PM_RIGHT);
-		slider_scale = move_towards_f32(slider_scale, should_scale?
-		                                SLIDER_SCALE_TARGET : 1.0, scale_delta);
+		if (should_scale) ctx->pms.scale_t[PM_RIGHT] += SLIDER_SCALE_SPEED * ctx->dt;
+		else              ctx->pms.scale_t[PM_RIGHT] -= SLIDER_SCALE_SPEED * ctx->dt;
+		CLAMP01(ctx->pms.scale_t[PM_RIGHT]);
+
+		f32 slider_scale = lerp(1, SLIDER_SCALE_TARGET, ctx->pms.scale_t[PM_RIGHT]);
+		f32 line_len     = 8;
 
 		/* NOTE: North-East */
-		f32 line_len = 8;
 		v2 start = {
 			.x = sv.pos.x + (param.x * sv.size.w) + 0.5 * radius,
 			.y = sv.pos.y + (param.y * sv.size.h) + 0.5 * radius,

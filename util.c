@@ -143,6 +143,7 @@ typedef struct {
 } ModeChangeState;
 
 typedef struct {
+	f32 scale_t[3];
 	f32 base_hue;
 	f32 fractional_hue;
 } PickerModeState;
