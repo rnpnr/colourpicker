@@ -95,8 +95,7 @@ enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
 #define SLIDER_BORDER_COLOUR   (Color){.r = 0x00, .g = 0x00, .b = 0x00, .a = 0xCC}
 #define SLIDER_BORDER_WIDTH    3.0f
-#define SLIDER_ROUNDNESS       0.5f
-#define SLIDER_BORDER_RADIUS   10.0f
+#define SLIDER_ROUNDNESS       0.035f
 #define SLIDER_SCALE_SPEED     8.0f
 #define SLIDER_SCALE_TARGET    1.5f
 #define SLIDER_TRI_SIZE        (v2){.x = 6, .y = 8}

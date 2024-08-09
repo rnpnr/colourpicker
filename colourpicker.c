@@ -716,7 +716,9 @@ static void
 do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f32 *colours)
 {
 	f32 border_thick = SLIDER_BORDER_WIDTH;
-	f32 radius       = SLIDER_BORDER_RADIUS;
+	f32 radius       = SLIDER_ROUNDNESS / 2;
+	/* NOTE: scale radius by rect width or height to adapt to window scaling */
+	radius          *= (r.size.w > r.size.h)? r.size.h : r.size.w;
 
 	BeginShaderMode(ctx->picker_shader);
 	rlEnableShader(ctx->picker_shader.id);
