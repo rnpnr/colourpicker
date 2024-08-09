@@ -1,7 +1,9 @@
 #!/bin/sh
 
+version=0.0
+
 cflags=${CFLAGS:-"-march=native -O3 -Wall"}
-cflags="${cflags} -std=c11 -I./external/include"
+cflags="${cflags} -std=c11 -I./external/include -DVERSION=\"$version\""
 ldflags=${LDFLAGS:-"-flto"}
 ldflags="$ldflags -lraylib -lm"
 

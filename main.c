@@ -120,6 +120,10 @@ main(i32 argc, char *argv[])
 		v4 rgb = hsv_to_rgb(ctx.colour);
 		for (i32 i = 1; i < argc; i++) {
 			if (argv[i][0] == '-') {
+				if (argv[i][1] == 'v') {
+					printf("colour picker %s\n", VERSION);
+					return 0;
+				}
 				if (argv[i + 1] == NULL ||
 				    (argv[i][1] == 'h' && !ISHEX(argv[i + 1][0])))
 					usage(argv[0]);
