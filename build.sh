@@ -7,13 +7,18 @@ cflags="${cflags} -std=c11 -I./external/include -DVERSION=\"$version\""
 ldflags=${LDFLAGS:-"-flto"}
 ldflags="$ldflags -lraylib -lm"
 
+output="colourpicker"
+
 debug=${DEBUG}
 
 cc=${CC:-cc}
 system_raylib=${USE_SYSTEM_RAYLIB:-$debug}
 
 case $(uname -s) in
-MINGW64*) ldflags="$ldflags -mwindows -lgdi32 -lwinmm" ;;
+MINGW64*)
+	output="Colour Picker"
+	ldflags="$ldflags -mwindows -lgdi32 -lwinmm"
+	;;
 esac
 
 # NOTE: clones and builds a static raylib if system lib is not requested
@@ -53,4 +58,4 @@ if [ "$debug" ]; then
 	${cc} $libcflags colourpicker.c -o libcolourpicker.so $libldflags
 fi
 
-${cc} $cflags -o colourpicker main.c $ldflags
+${cc} $cflags -o "$output" main.c $ldflags
