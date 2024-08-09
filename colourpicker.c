@@ -410,11 +410,15 @@ do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_s
 {
 	i32 pressed_mask = do_button(btn, mouse, r, dt, hover_speed);
 
-	f32 param = lerp(1, scale_target, btn->hover_t);
-	Rect sr   = scale_rect_centered(r, (v2){.x = param, .y = param});
+	f32 param  = lerp(1, scale_target, btn->hover_t);
+	v2  bscale = (v2){
+		.x = param + RECT_BTN_BORDER_WIDTH / r.size.w,
+		.y = param + RECT_BTN_BORDER_WIDTH / r.size.h,
+	};
+	Rect sr    = scale_rect_centered(r, (v2){.x = param, .y = param});
+	Rect sb    = scale_rect_centered(r, bscale);
+	DrawRectangleRounded(sb.rr, SELECTOR_ROUNDNESS, 0, fade(SELECTOR_BORDER_COLOUR, fade_t));
 	DrawRectangleRounded(sr.rr, SELECTOR_ROUNDNESS, 0, fade(bg, fade_t));
-	DrawRectangleRoundedLinesEx(sr.rr, SELECTOR_ROUNDNESS, 0, SELECTOR_BORDER_WIDTH,
-	                            fade(SELECTOR_BORDER_COLOUR, fade_t));
 
 	return pressed_mask;
 }
@@ -592,8 +596,8 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	ColourStackState *css = &ctx->colour_stack;
 
 	/* NOTE: Small adjusment to align with mode text. TODO: Cleanup? */
-	sa.pos.y  += 0.025 * sa.size.h;
-	sa.size.h *= 0.98;
+	sa = scale_rect_centered(sa, (v2){.x = 1, .y = 0.98});
+	sa.pos.y += 0.02 * sa.size.h;
 
 	Rect r    = sa;
 	r.size.h *= 1.0 / (ARRAY_COUNT(css->items) + 3);
