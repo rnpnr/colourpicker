@@ -1,6 +1,6 @@
 #!/bin/sh
 
-version=0.0
+version=1.0
 
 cflags=${CFLAGS:-"-march=native -O3 -Wall"}
 cflags="${cflags} -std=c11 -I./external/include -DVERSION=\"$version\""
