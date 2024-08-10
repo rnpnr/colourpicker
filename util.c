@@ -28,9 +28,13 @@ typedef uint8_t   u8;
 typedef int32_t   i32;
 typedef uint32_t  u32;
 typedef uint32_t  b32;
+typedef int64_t   i64;
 typedef float     f32;
 typedef double    f64;
 typedef ptrdiff_t size;
+
+typedef struct { size len; char *data; } s8;
+#define s8(s) (s8){.len = sizeof(s) - 1, .data = s}
 
 typedef union {
 	struct { u32 w, h; };
@@ -71,6 +75,7 @@ enum colour_picker_mode {
 
 enum colour_picker_flags {
 	CPF_REFILL_TEXTURE = 1 << 0,
+	CPF_PRINT_DEBUG    = 1 << 30,
 };
 
 enum input_indices {
@@ -154,6 +159,36 @@ typedef struct {
 	i32  buf_len;
 	char buf[64];
 } InputState;
+
+#ifdef _DEBUG
+enum clock_counts {
+	CC_WHOLE_RUN,
+	CC_DO_PICKER,
+	CC_DO_SLIDER,
+	CC_UPPER,
+	CC_LOWER,
+	CC_TEMP,
+	CC_LAST
+};
+
+static struct {
+	i64 cpu_cycles[CC_LAST];
+	i64 total_cycles[CC_LAST];
+	i64 hit_count[CC_LAST];
+} g_debug_clock_counts;
+
+#define BEGIN_CYCLE_COUNT(cc_name) \
+	g_debug_clock_counts.cpu_cycles[cc_name] = __rdtsc(); \
+	g_debug_clock_counts.hit_count[cc_name]++
+
+#define END_CYCLE_COUNT(cc_name) \
+	g_debug_clock_counts.cpu_cycles[cc_name] = __rdtsc() - g_debug_clock_counts.cpu_cycles[cc_name]; \
+	g_debug_clock_counts.total_cycles[cc_name] += g_debug_clock_counts.cpu_cycles[cc_name]
+
+#else
+#define BEGIN_CYCLE_COUNT(a)
+#define END_CYCLE_COUNT(a)
+#endif
 
 typedef struct {
 	v4 colour, previous_colour;

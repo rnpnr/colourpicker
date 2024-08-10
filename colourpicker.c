@@ -5,9 +5,9 @@
 
 #include "util.c"
 
-static const char *mode_labels[CM_LAST][4] = {
-	[CM_RGB] = { "R", "G", "B", "A" },
-	[CM_HSV] = { "H", "S", "V", "A" },
+static s8 mode_labels[CM_LAST][4] = {
+	[CM_RGB] = { s8("R"), s8("G"), s8("B"), s8("A") },
+	[CM_HSV] = { s8("H"), s8("S"), s8("V"), s8("A") },
 };
 
 static void
@@ -57,9 +57,25 @@ lerp_v4(v4 a, v4 b, f32 t)
 }
 
 static v2
-left_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
+measure_text(Font font, s8 text)
 {
-	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
+	v2 result = {.y = font.baseSize};
+
+	for (size i = 0; i < text.len; i++) {
+		/* NOTE: assumes font glyphs are ordered (they are in our embedded fonts) */
+		i32 idx   = (i32)text.data[i] - 32;
+		result.x += font.glyphs[idx].advanceX;
+		if (font.glyphs[idx].advanceX == 0)
+			result.x += (font.recs[idx].width + font.glyphs[idx].offsetX);
+	}
+
+	return result;
+}
+
+static v2
+left_align_text_in_rect(Rect r, s8 text, Font font, f32 fontsize)
+{
+	v2 ts    = measure_text(font, text);
 	v2 delta = { .h = r.size.h - ts.h };
 	return (v2) { .x = r.pos.x, .y = r.pos.y + 0.5 * delta.h, };
 }
@@ -76,9 +92,9 @@ scale_rect_centered(Rect r, v2 scale)
 }
 
 static v2
-center_align_text_in_rect(Rect r, const char *text, Font font, f32 fontsize)
+center_align_text_in_rect(Rect r, s8 text, Font font)
 {
-	v2 ts    = { .rv = MeasureTextEx(font, text, fontsize, 0) };
+	v2 ts    = measure_text(font, text);
 	v2 delta = { .w = r.size.w - ts.w, .h = r.size.h - ts.h };
 	return (v2) {
 		.x = r.pos.x + 0.5 * delta.w,
@@ -290,7 +306,7 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 static void
 do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 {
-	v2 ts  = {.rv = MeasureTextEx(ctx->font, ctx->is.buf, ctx->font_size, 0)};
+	v2 ts  = measure_text(ctx->font, (s8){.len = ctx->is.buf_len, .data = ctx->is.buf});
 	v2 pos = {.x = r.pos.x, .y = r.pos.y + (r.size.y - ts.y) / 2};
 
 	i32 buf_delta = ctx->is.buf_len - max_disp_chars;
@@ -298,7 +314,8 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 	char *buf     = ctx->is.buf + buf_delta;
 	{
 		/* NOTE: drop a char if the subtext still doesn't fit */
-		v2 nts = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
+		v2 nts = measure_text(ctx->font, (s8){.len = ctx->is.buf_len - buf_delta,
+		                                      .data = buf});
 		if (nts.w > 0.96 * r.size.w)
 			buf++;
 	}
@@ -323,26 +340,20 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 		f32 x_off = TEXT_HALF_CHAR_WIDTH, x_bounds = r.size.w * ctx->is.cursor_hover_p;
 		u32 i;
 		for (i = 0; i < ctx->is.buf_len && x_off < x_bounds; i++) {
-			u32 idx = GetGlyphIndex(ctx->font, ctx->is.buf[i]);
+			/* NOTE: assumes font glyphs are ordered */
+			i32 idx = ctx->is.buf[i] - 32;
+			x_off  += ctx->font.glyphs[idx].advanceX;
 			if (ctx->font.glyphs[idx].advanceX == 0)
 				x_off += ctx->font.recs[idx].width;
-			else
-				x_off += ctx->font.glyphs[idx].advanceX;
 		}
 		ctx->is.cursor = i;
 	}
 
-	/* NOTE: Braindead NULL termination stupidity */
-	char saved_c = buf[ctx->is.cursor - buf_delta];
-	buf[ctx->is.cursor - buf_delta] = 0;
-
-	v2 sts       = {.rv = MeasureTextEx(ctx->font, buf, ctx->font_size, 0)};
+	v2 sts = measure_text(ctx->font, (s8){.len = ctx->is.cursor - buf_delta, .data = buf});
 	f32 cursor_x = r.pos.x + sts.x;
 	f32 cursor_width;
 	if (ctx->is.cursor == ctx->is.buf_len) cursor_width = MIN(ctx->window_size.w * 0.03, 20);
 	else                                   cursor_width = MIN(ctx->window_size.w * 0.01, 6);
-
-	buf[ctx->is.cursor - buf_delta] = saved_c;
 
 	Rect cursor_r = {
 		.pos  = {.x = cursor_x,     .y = pos.y},
@@ -424,16 +435,16 @@ do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_s
 }
 
 static i32
-do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *text, v4 fg, Color bg)
+do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, s8 text, v4 fg, Color bg)
 {
 	i32 pressed_mask = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
 
-	v2 tpos   = center_align_text_in_rect(r, text, ctx->font, ctx->font_size);
+	v2 tpos   = center_align_text_in_rect(r, text, ctx->font);
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
 	v4 colour = lerp_v4(fg, ctx->hover_colour, btn->hover_t);
 
-	DrawTextEx(ctx->font, text, spos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
-	DrawTextEx(ctx->font, text, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
+	DrawTextEx(ctx->font, text.data, spos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
+	DrawTextEx(ctx->font, text.data, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
 
 	return pressed_mask;
 }
@@ -506,17 +517,17 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 			set_text_input_idx(ctx, label_idx + 1, vr, relative_mouse);
 
 		if (ctx->is.idx != (label_idx + 1)) {
-			const char *value = TextFormat("%0.02f", current);
+			s8 value = {.len = 4, .data = (char *)TextFormat("%0.02f", current)};
 			fpos = left_align_text_in_rect(vr, value, ctx->font, ctx->font_size);
-			DrawTextEx(ctx->font, value, fpos.rv, ctx->font_size, 0, colour_rl);
+			DrawTextEx(ctx->font, value.data, fpos.rv, ctx->font_size, 0, colour_rl);
 		} else {
 			do_text_input(ctx, vr, colour_rl, 4);
 		}
 	}
 
-	const char *label = mode_labels[ctx->colour_mode][label_idx];
-	fpos = center_align_text_in_rect(lr, label, ctx->font, ctx->font_size);
-	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
+	s8 label = mode_labels[ctx->colour_mode][label_idx];
+	fpos = center_align_text_in_rect(lr, label, ctx->font);
+	DrawTextEx(ctx->font, label.data, fpos.rv, ctx->font_size, 0, ctx->fg);
 }
 
 static void
@@ -526,13 +537,14 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	Rect mode_r;
 	get_slider_subrects(r, 0, 0, &mode_r);
 
-	char *mode_txt;
+	s8 mode_txt = s8("");
 	switch (ctx->colour_mode) {
-	case CM_RGB:  mode_txt = "RGB"; break;
-	case CM_HSV:  mode_txt = "HSV"; break;
-	case CM_LAST: ASSERT(0);        break;
+	case CM_RGB:  mode_txt = s8("RGB"); break;
+	case CM_HSV:  mode_txt = s8("HSV"); break;
+	case CM_LAST: ASSERT(0);            break;
 	}
-	v2 mode_ts     = {.rv = MeasureTextEx(ctx->font, mode_txt, ctx->font_size, 0)};
+
+	v2 mode_ts     = measure_text(ctx->font, mode_txt);
 	mode_r.pos.y  += (mode_r.size.h - mode_ts.h) / 2;
 	mode_r.size.w  = mode_ts.w;
 
@@ -540,12 +552,12 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	if (mouse_mask & MOUSE_LEFT)  step_colour_mode(ctx, 1);
 	if (mouse_mask & MOUSE_RIGHT) step_colour_mode(ctx, -1);
 
-	Color hc          = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-	const char *hex   = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
-	const char *label = "RGB: ";
+	Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+	s8 hex   = {.len = 8, .data = (char *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a)};
+	s8 label = s8("RGB: ");
 
-	v2 label_size = {.rv = MeasureTextEx(ctx->font, label, ctx->font_size, 0)};
-	v2 hex_size   = {.rv = MeasureTextEx(ctx->font, hex,   ctx->font_size, 0)};
+	v2 label_size = measure_text(ctx->font, label);
+	v2 hex_size   = measure_text(ctx->font, hex);
 
 	f32 extra_input_scale = 1.07;
 	hex_r.size.w = extra_input_scale * (label_size.w + hex_size.w);
@@ -558,8 +570,8 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	if (!hex_collides && ctx->is.idx == INPUT_HEX &&
 	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		set_text_input_idx(ctx, -1, hex_r, relative_mouse);
-		hc  = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-		hex = TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+		hc       = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+		hex.data = (char *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 	}
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
@@ -576,17 +588,17 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	v4 mode_colour = lerp_v4(fg, ctx->hover_colour, ctx->sbs.mode.hover_t);
 
 	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
-	DrawTextEx(ctx->font, label, fpos.rv, ctx->font_size, 0, ctx->fg);
+	DrawTextEx(ctx->font, (char *)label.data, fpos.rv, ctx->font_size, 0, ctx->fg);
 
 	Color hex_colour_rl = colour_from_normalized(hex_colour);
 	if (ctx->is.idx != INPUT_HEX) {
 		fpos = left_align_text_in_rect(hex_r, hex, ctx->font, ctx->font_size);
-		DrawTextEx(ctx->font, hex, fpos.rv, ctx->font_size, 0, hex_colour_rl);
+		DrawTextEx(ctx->font, hex.data, fpos.rv, ctx->font_size, 0, hex_colour_rl);
 	} else {
 		do_text_input(ctx, hex_r, hex_colour_rl, 8);
 	}
 
-	DrawTextEx(ctx->font, mode_txt, mode_r.pos.rv, ctx->font_size, 0,
+	DrawTextEx(ctx->font, mode_txt.data, mode_r.pos.rv, ctx->font_size, 0,
 	           colour_from_normalized(mode_colour));
 }
 
@@ -672,8 +684,8 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	DrawRectangleRec(cs[0].rr, pcolour);
 	DrawRectangleRec(cs[1].rr, colour);
 
-	v4 fg     = normalize_colour(pack_rl_colour(ctx->fg));
-	char *labels[2] = {"Revert", "Apply"};
+	v4 fg        = normalize_colour(pack_rl_colour(ctx->fg));
+	s8 labels[2] = {s8("Revert"), s8("Apply")};
 
 	i32 pressed_idx = -1;
 	for (i32 i = 0; i < ARRAY_COUNT(cs); i++) {
@@ -690,12 +702,12 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 
 		v4 colour = lerp_v4(fg, ctx->hover_colour, ctx->selection_hover_t[i]);
 
-		v2 fpos = center_align_text_in_rect(cs[i], labels[i], ctx->font, ctx->font_size);
+		v2 fpos = center_align_text_in_rect(cs[i], labels[i], ctx->font);
 		v2 pos  = fpos;
 		pos.x  += 1.75;
 		pos.y  += 2;
-		DrawTextEx(ctx->font, labels[i], pos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
-		DrawTextEx(ctx->font, labels[i], fpos.rv, ctx->font_size, 0,
+		DrawTextEx(ctx->font, labels[i].data, pos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
+		DrawTextEx(ctx->font, labels[i].data, fpos.rv, ctx->font_size, 0,
 		           colour_from_normalized(colour));
 	}
 
@@ -740,6 +752,8 @@ do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f3
 static void
 do_slider_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 {
+	BEGIN_CYCLE_COUNT(CC_DO_SLIDER);
+
 	Rect tr  = {
 		.size = {
 			.w = ctx->picker_texture.texture.width,
@@ -779,6 +793,8 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 	do_slider_shader(ctx, tr, ctx->colour_mode, regions, (f32 *)colours);
 
 	EndTextureMode();
+
+	END_CYCLE_COUNT(CC_DO_SLIDER);
 }
 
 
@@ -828,6 +844,8 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 static void
 do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 {
+	BEGIN_CYCLE_COUNT(CC_DO_PICKER);
+
 	v4 colour = get_formatted_colour(ctx, CM_HSV);
 	colour.x  = ctx->pms.base_hue + ctx->pms.fractional_hue;
 
@@ -938,11 +956,61 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 		ctx->held_idx = -1;
 
 	store_formatted_colour(ctx, colour, CM_HSV);
+
+	END_CYCLE_COUNT(CC_DO_PICKER);
+}
+
+static void
+debug_dump_info(ColourPickerCtx *ctx)
+{
+#ifdef _DEBUG
+	if (IsKeyPressed(KEY_F1))
+		ctx->flags ^= CPF_PRINT_DEBUG;
+
+	DrawFPS(20, 20);
+
+	static char *fmts[CC_LAST] = {
+		[CC_WHOLE_RUN] = "Whole Run:   %7ld cyc | %2d h | %7d cyc/h\n",
+		[CC_DO_PICKER] = "Picker Mode: %7ld cyc | %2d h | %7d cyc/h\n",
+		[CC_DO_SLIDER] = "Slider Mode: %7ld cyc | %2d h | %7d cyc/h\n",
+		[CC_UPPER]     = "Upper:       %7ld cyc | %2d h | %7d cyc/h\n",
+		[CC_LOWER]     = "Lower:       %7ld cyc | %2d h | %7d cyc/h\n",
+		[CC_TEMP]      = "Temp:        %7ld cyc | %2d h | %7d cyc/h\n",
+	};
+
+	i64 cycs[CC_LAST];
+	i64 hits[CC_LAST];
+
+	for (u32 i = 0; i < CC_LAST; i++) {
+		cycs[i] = g_debug_clock_counts.total_cycles[i];
+		hits[i] = g_debug_clock_counts.hit_count[i];
+		g_debug_clock_counts.hit_count[i]  = 0;
+		g_debug_clock_counts.total_cycles[i] = 0;
+	}
+
+	if (!(ctx->flags & CPF_PRINT_DEBUG))
+		return;
+
+	static u32 fcount;
+	fcount++;
+	if (fcount != 60)
+		return;
+	fcount = 0;
+
+	printf("Begin Cycle Dump\n");
+	for (u32 i = 0; i < CC_LAST; i++) {
+		if (hits[i] == 0)
+			continue;
+		printf(fmts[i], cycs[i], hits[i], cycs[i]/hits[i]);
+	}
+#endif
 }
 
 DEBUG_EXPORT void
 do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse_pos)
 {
+	BEGIN_CYCLE_COUNT(CC_WHOLE_RUN);
+
 	if (IsWindowResized()) {
 		ctx->window_size.h = GetScreenHeight();
 		ctx->window_size.w = ctx->window_size.h / WINDOW_ASPECT_RATIO;
@@ -986,6 +1054,8 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		.pos  = {.x = upper.pos.x,      .y = upper.pos.y + ws.h * 0.6},
 		.size = {.w = ws.w - 2 * pad.x, .h = ws.h * 0.4 - 1 * pad.y},
 	};
+
+	BEGIN_CYCLE_COUNT(CC_UPPER);
 
 	Rect ma = cut_rect_left(upper, 0.84);
 	Rect sa = cut_rect_right(upper, 0.84);
@@ -1049,7 +1119,10 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		DrawRectangleRec(ma.rr, fade(ctx->bg, 1 - ctx->mcs.mode_visible_t));
 	}
 
+	END_CYCLE_COUNT(CC_UPPER);
+
 	{
+		BEGIN_CYCLE_COUNT(CC_LOWER);
 		Rect cb    = lower;
 		cb.size.h *= 0.25;
 		cb.pos.y  += 0.04 * lower.size.h;
@@ -1124,11 +1197,11 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 
-		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, "Copy", fg, bg))
+		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, s8("Copy"), fg, bg))
 			SetClipboardText(TextFormat("%02x%02x%02x%02x", bg.r, bg.g, bg.b, bg.a));
 		btn_r.pos.y += 0.54 * mb.size.h;
 
-		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, "Paste", fg, bg)) {
+		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, s8("Paste"), fg, bg)) {
 			char *txt = (char *)GetClipboardText();
 			if (txt) {
 				v4 new_colour = normalize_colour(parse_hex_u32(txt));
@@ -1140,10 +1213,11 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 				}
 			}
 		}
+
+		END_CYCLE_COUNT(CC_LOWER);
 	}
 
-#ifdef _DEBUG
-	DrawFPS(20, 20);
-#endif
+	END_CYCLE_COUNT(CC_WHOLE_RUN);
 
+	debug_dump_info(ctx);
 }
