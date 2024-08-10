@@ -432,7 +432,7 @@ do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, char *t
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
 	v4 colour = lerp_v4(fg, ctx->hover_colour, btn->hover_t);
 
-	DrawTextEx(ctx->font, text, spos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
+	DrawTextEx(ctx->font, text, spos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
 	DrawTextEx(ctx->font, text, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
 
 	return pressed_mask;
@@ -694,7 +694,7 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 		v2 pos  = fpos;
 		pos.x  += 1.75;
 		pos.y  += 2;
-		DrawTextEx(ctx->font, labels[i], pos.rv, ctx->font_size, 0, Fade(BLACK, 0.8));
+		DrawTextEx(ctx->font, labels[i], pos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
 		DrawTextEx(ctx->font, labels[i], fpos.rv, ctx->font_size, 0,
 		           colour_from_normalized(colour));
 	}
@@ -1046,7 +1046,7 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 			ASSERT(0);
 			break;
 		}
-		DrawRectangleRec(ma.rr, Fade(ctx->bg, 1 - ctx->mcs.mode_visible_t));
+		DrawRectangleRec(ma.rr, fade(ctx->bg, 1 - ctx->mcs.mode_visible_t));
 	}
 
 	{
