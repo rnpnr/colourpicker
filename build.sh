@@ -17,7 +17,8 @@ system_raylib=${USE_SYSTEM_RAYLIB:-$debug}
 case $(uname -s) in
 MINGW64*)
 	output="Colour Picker"
-	ldflags="$ldflags -mwindows -lgdi32 -lwinmm"
+	windres assets/colourpicker.rc assets/colourpicker.rc.o
+	ldflags="assets/colourpicker.rc.o $ldflags -mwindows -lgdi32 -lwinmm"
 	;;
 esac
 

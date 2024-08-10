@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+      tags: ["v*.*"]
+
+env:
+  CFLAGS: "-march=x86-64-v2 -O3"
+
+jobs:
+  github:
+    name: Build Windows Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      CC: clang
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: clang64
+          update: true
+          install: git mingw-w64-clang-x86_64-clang
+          pacboy: ninja:p cmake:p
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: 'Colour Picker.exe'
+

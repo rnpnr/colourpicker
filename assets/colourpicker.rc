@@ -1,0 +1,22 @@
+CAFE ICON "colour_picker.ico"
+
+1 VERSIONINFO
+FILEVERSION     0,0,0,0
+PRODUCTVERSION  0,0,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904E4" // English US
+    BEGIN
+      VALUE "FileDescription", "Colour Picker"
+      VALUE "FileVersion",     "0.0.0"
+      VALUE "InternalName",    "Colour Picker"
+      VALUE "ProductName",     "Colour Picker"
+      VALUE "ProductVersion",   "0.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1252 // English US
+  END
+END

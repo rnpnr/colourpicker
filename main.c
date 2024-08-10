@@ -161,12 +161,12 @@ main(i32 argc, char *argv[])
 
 	{
 		Image icon;
-		RenderTexture icon_texture = LoadRenderTexture(48, 48);
+		RenderTexture icon_texture = LoadRenderTexture(128, 128);
 		BeginDrawing();
 		BeginTextureMode(icon_texture);
 		ClearBackground(ctx.bg);
-		DrawCircleGradient(24, 24, 16, colour_from_normalized(hsv_to_rgb(ctx.colour)), ctx.bg);
-		DrawRing((Vector2){24, 24}, 13, 16, 0, 360, 32, BLACK);
+		DrawCircleGradient(64, 64, 48, colour_from_normalized(hsv_to_rgb(ctx.colour)), ctx.bg);
+		DrawRing((Vector2){64, 64}, 45, 48, 0, 360, 128, SELECTOR_BORDER_COLOUR);
 		EndTextureMode();
 		EndDrawing();
 		icon = LoadImageFromTexture(icon_texture.texture);
