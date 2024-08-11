@@ -20,7 +20,6 @@ uniform float u_radius;
 uniform float u_border_thick;
 uniform vec4  u_colours[3];
 uniform vec4  u_regions[4];
-uniform vec2  u_size;
 
 /* input:  h [0,360] | s,v [0, 1] *
  * output: rgb [0,1]              */

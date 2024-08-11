@@ -221,8 +221,7 @@ typedef struct {
 	RenderTexture picker_texture;
 
 	i32 mode_id, colour_mode_id, colours_id;
-	i32 regions_id, size_id;
-	i32 radius_id, border_thick_id;
+	i32 regions_id, radius_id, border_thick_id;
 
 	u32  flags;
 	enum colour_mode        colour_mode;

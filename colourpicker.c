@@ -763,10 +763,9 @@ do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f3
 	rlSetUniform(ctx->radius_id,       &radius,       RL_SHADER_UNIFORM_FLOAT, 1);
 	rlSetUniform(ctx->border_thick_id, &border_thick, RL_SHADER_UNIFORM_FLOAT, 1);
 	rlSetUniform(ctx->colour_mode_id,  &colour_mode,  RL_SHADER_UNIFORM_INT,   1);
-	rlSetUniform(ctx->size_id,         r.size.E,      RL_SHADER_UNIFORM_VEC2,  1);
 	rlSetUniform(ctx->colours_id,      colours,       RL_SHADER_UNIFORM_VEC4,  3);
 	rlSetUniform(ctx->regions_id,      regions,       RL_SHADER_UNIFORM_VEC4,  4);
-	DrawRectangleRec(r.rr, BLACK);
+	DrawRectanglePro(r.rr, (Vector2){0}, 0, BLACK);
 	EndShaderMode();
 }
 
@@ -1053,7 +1052,6 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		ctx->colour_mode_id  = GetShaderLocation(ctx->picker_shader, "u_colour_mode");
 		ctx->colours_id      = GetShaderLocation(ctx->picker_shader, "u_colours");
 		ctx->regions_id      = GetShaderLocation(ctx->picker_shader, "u_regions");
-		ctx->size_id         = GetShaderLocation(ctx->picker_shader, "u_size");
 		ctx->radius_id       = GetShaderLocation(ctx->picker_shader, "u_radius");
 		ctx->border_thick_id = GetShaderLocation(ctx->picker_shader, "u_border_thick");
 	}
