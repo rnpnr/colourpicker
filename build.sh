@@ -2,7 +2,7 @@
 
 version=1.0
 
-cflags=${CFLAGS:-"-march=native -O3 -Wall"}
+cflags=${CFLAGS:-"-march=native -O3 -Wall -Wextra"}
 cflags="${cflags} -std=c11 -I./external/include -DVERSION=\"$version\""
 ldflags=${LDFLAGS:-"-flto"}
 ldflags="$ldflags -lraylib -lm"

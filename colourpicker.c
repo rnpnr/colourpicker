@@ -73,7 +73,7 @@ measure_text(Font font, s8 text)
 }
 
 static v2
-left_align_text_in_rect(Rect r, s8 text, Font font, f32 fontsize)
+left_align_text_in_rect(Rect r, s8 text, Font font)
 {
 	v2 ts    = measure_text(font, text);
 	v2 delta = { .h = r.size.h - ts.h };
@@ -273,7 +273,7 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 static void
 set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mouse)
 {
-	if (ctx->is.idx != idx)
+	if (ctx->is.idx != (i32)idx)
 		parse_and_store_text_input(ctx);
 
 	if (idx == INPUT_HEX) {
@@ -338,7 +338,7 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 		/* NOTE: extra offset to help with putting a cursor at idx 0 */
 		#define TEXT_HALF_CHAR_WIDTH 10
 		f32 x_off = TEXT_HALF_CHAR_WIDTH, x_bounds = r.size.w * ctx->is.cursor_hover_p;
-		u32 i;
+		i32 i;
 		for (i = 0; i < ctx->is.buf_len && x_off < x_bounds; i++) {
 			/* NOTE: assumes font glyphs are ordered */
 			i32 idx = ctx->is.buf[i] - 32;
@@ -518,7 +518,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 
 		if (ctx->is.idx != (label_idx + 1)) {
 			s8 value = {.len = 4, .data = (char *)TextFormat("%0.02f", current)};
-			fpos = left_align_text_in_rect(vr, value, ctx->font, ctx->font_size);
+			fpos = left_align_text_in_rect(vr, value, ctx->font);
 			DrawTextEx(ctx->font, value.data, fpos.rv, ctx->font_size, 0, colour_rl);
 		} else {
 			do_text_input(ctx, vr, colour_rl, 4);
@@ -587,12 +587,12 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	v4 hex_colour  = lerp_v4(fg, ctx->hover_colour, ctx->sbs.hex_hover_t);
 	v4 mode_colour = lerp_v4(fg, ctx->hover_colour, ctx->sbs.mode.hover_t);
 
-	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font, ctx->font_size);
+	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font);
 	DrawTextEx(ctx->font, (char *)label.data, fpos.rv, ctx->font_size, 0, ctx->fg);
 
 	Color hex_colour_rl = colour_from_normalized(hex_colour);
 	if (ctx->is.idx != INPUT_HEX) {
-		fpos = left_align_text_in_rect(hex_r, hex, ctx->font, ctx->font_size);
+		fpos = left_align_text_in_rect(hex_r, hex, ctx->font);
 		DrawTextEx(ctx->font, hex.data, fpos.rv, ctx->font_size, 0, hex_colour_rl);
 	} else {
 		do_text_input(ctx, hex_r, hex_colour_rl, 8);
@@ -688,7 +688,7 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	s8 labels[2] = {s8("Revert"), s8("Apply")};
 
 	i32 pressed_idx = -1;
-	for (i32 i = 0; i < ARRAY_COUNT(cs); i++) {
+	for (u32 i = 0; i < ARRAY_COUNT(cs); i++) {
 		if (CheckCollisionPointRec(ctx->mouse_pos.rv, cs[i].rr) && ctx->held_idx == -1) {
 			ctx->selection_hover_t[i] += TEXT_HOVER_SPEED * ctx->dt;
 
@@ -963,6 +963,7 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 static void
 debug_dump_info(ColourPickerCtx *ctx)
 {
+	(void)ctx;
 #ifdef _DEBUG
 	if (IsKeyPressed(KEY_F1))
 		ctx->flags ^= CPF_PRINT_DEBUG;
