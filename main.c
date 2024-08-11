@@ -175,8 +175,7 @@ main(i32 argc, char *argv[])
 		UnloadImage(icon);
 	}
 
-	ctx.font      = LoadFont_lora_sb_0_inc();
-	ctx.font_size = ctx.font.baseSize;
+	ctx.font = LoadFont_lora_sb_0_inc();
 
 	while(!WindowShouldClose()) {
 		do_debug();

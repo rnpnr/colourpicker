@@ -200,8 +200,7 @@ typedef struct {
 
 	f32 dt;
 
-	Font font;
-	i32  font_size;
+	Font  font;
 	Color bg, fg;
 
 	InputState      is;

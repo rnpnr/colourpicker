@@ -72,6 +72,32 @@ measure_text(Font font, s8 text)
 	return result;
 }
 
+static void
+draw_text(Font font, s8 text, v2 pos, Color colour)
+{
+	for (size i = 0; i < text.len; i++) {
+		/* NOTE: assumes font glyphs are ordered (they are in our embedded fonts) */
+		i32 idx = text.data[i] - 32;
+		Rectangle dst = {
+			pos.x + font.glyphs[idx].offsetX - font.glyphPadding,
+			pos.y + font.glyphs[idx].offsetY - font.glyphPadding,
+			font.recs[idx].width  + 2.0f * font.glyphPadding,
+			font.recs[idx].height + 2.0f * font.glyphPadding
+		};
+		Rectangle src = {
+			font.recs[idx].x - font.glyphPadding,
+			font.recs[idx].y - font.glyphPadding,
+			font.recs[idx].width  + 2.0f * font.glyphPadding,
+			font.recs[idx].height + 2.0f * font.glyphPadding
+		};
+		DrawTexturePro(font.texture, src, dst, (Vector2){0}, 0, colour);
+
+		pos.x += font.glyphs[idx].advanceX;
+		if (font.glyphs[idx].advanceX == 0)
+			pos.x += font.recs[idx].width;
+	}
+}
+
 static v2
 left_align_text_in_rect(Rect r, s8 text, Font font)
 {
@@ -311,15 +337,16 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 
 	i32 buf_delta = ctx->is.buf_len - max_disp_chars;
 	if (buf_delta < 0) buf_delta = 0;
-	char *buf     = ctx->is.buf + buf_delta;
+	s8 buf = {.len = ctx->is.buf_len - buf_delta, .data =ctx->is.buf + buf_delta};
 	{
 		/* NOTE: drop a char if the subtext still doesn't fit */
-		v2 nts = measure_text(ctx->font, (s8){.len = ctx->is.buf_len - buf_delta,
-		                                      .data = buf});
-		if (nts.w > 0.96 * r.size.w)
-			buf++;
+		v2 nts = measure_text(ctx->font, buf);
+		if (nts.w > 0.96 * r.size.w) {
+			buf.data++;
+			buf.len--;
+		}
 	}
-	DrawTextEx(ctx->font, buf, pos.rv, ctx->font_size, 0, colour);
+	draw_text(ctx->font, buf, pos, colour);
 
 	ctx->is.cursor_t = move_towards_f32(ctx->is.cursor_t, ctx->is.cursor_t_target,
 	                                    1.5 * ctx->dt);
@@ -349,7 +376,8 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 		ctx->is.cursor = i;
 	}
 
-	v2 sts = measure_text(ctx->font, (s8){.len = ctx->is.cursor - buf_delta, .data = buf});
+	buf.len = ctx->is.cursor - buf_delta;
+	v2 sts = measure_text(ctx->font, buf);
 	f32 cursor_x = r.pos.x + sts.x;
 	f32 cursor_width;
 	if (ctx->is.cursor == ctx->is.buf_len) cursor_width = MIN(ctx->window_size.w * 0.03, 20);
@@ -443,8 +471,8 @@ do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, s8 text
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
 	v4 colour = lerp_v4(fg, ctx->hover_colour, btn->hover_t);
 
-	DrawTextEx(ctx->font, text.data, spos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
-	DrawTextEx(ctx->font, text.data, tpos.rv, ctx->font_size, 0, colour_from_normalized(colour));
+	draw_text(ctx->font, text, spos, fade(BLACK, 0.8));
+	draw_text(ctx->font, text, tpos, colour_from_normalized(colour));
 
 	return pressed_mask;
 }
@@ -492,7 +520,6 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 		draw_cardinal_triangle(tri_mid, SLIDER_TRI_SIZE, tri_scale, NORTH, ctx->fg);
 	}
 
-	v2 fpos;
 	{
 		SliderState *s = &ctx->ss;
 		b32 collides = CheckCollisionPointRec(relative_mouse.rv, vr.rr);
@@ -518,16 +545,14 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 
 		if (ctx->is.idx != (label_idx + 1)) {
 			s8 value = {.len = 4, .data = (char *)TextFormat("%0.02f", current)};
-			fpos = left_align_text_in_rect(vr, value, ctx->font);
-			DrawTextEx(ctx->font, value.data, fpos.rv, ctx->font_size, 0, colour_rl);
+			draw_text(ctx->font, value, left_align_text_in_rect(vr, value, ctx->font), colour_rl);
 		} else {
 			do_text_input(ctx, vr, colour_rl, 4);
 		}
 	}
 
 	s8 label = mode_labels[ctx->colour_mode][label_idx];
-	fpos = center_align_text_in_rect(lr, label, ctx->font);
-	DrawTextEx(ctx->font, label.data, fpos.rv, ctx->font_size, 0, ctx->fg);
+	draw_text(ctx->font, label, center_align_text_in_rect(lr, label, ctx->font), ctx->fg);
 }
 
 static void
@@ -587,19 +612,16 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	v4 hex_colour  = lerp_v4(fg, ctx->hover_colour, ctx->sbs.hex_hover_t);
 	v4 mode_colour = lerp_v4(fg, ctx->hover_colour, ctx->sbs.mode.hover_t);
 
-	v2 fpos = left_align_text_in_rect(label_r, label, ctx->font);
-	DrawTextEx(ctx->font, (char *)label.data, fpos.rv, ctx->font_size, 0, ctx->fg);
+	draw_text(ctx->font, label, left_align_text_in_rect(label_r, label, ctx->font), ctx->fg);
 
 	Color hex_colour_rl = colour_from_normalized(hex_colour);
 	if (ctx->is.idx != INPUT_HEX) {
-		fpos = left_align_text_in_rect(hex_r, hex, ctx->font);
-		DrawTextEx(ctx->font, hex.data, fpos.rv, ctx->font_size, 0, hex_colour_rl);
+		draw_text(ctx->font, hex, left_align_text_in_rect(hex_r, hex, ctx->font), hex_colour_rl);
 	} else {
 		do_text_input(ctx, hex_r, hex_colour_rl, 8);
 	}
 
-	DrawTextEx(ctx->font, mode_txt.data, mode_r.pos.rv, ctx->font_size, 0,
-	           colour_from_normalized(mode_colour));
+	draw_text(ctx->font, mode_txt, mode_r.pos, colour_from_normalized(mode_colour));
 }
 
 static void
@@ -706,9 +728,8 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 		v2 pos  = fpos;
 		pos.x  += 1.75;
 		pos.y  += 2;
-		DrawTextEx(ctx->font, labels[i].data, pos.rv, ctx->font_size, 0, fade(BLACK, 0.8));
-		DrawTextEx(ctx->font, labels[i].data, fpos.rv, ctx->font_size, 0,
-		           colour_from_normalized(colour));
+		draw_text(ctx->font, labels[i], pos,  fade(BLACK, 0.8));
+		draw_text(ctx->font, labels[i], fpos, colour_from_normalized(colour));
 	}
 
 	DrawRectangleRoundedLinesEx(r.rr, SELECTOR_ROUNDNESS, 0, 4 * SELECTOR_BORDER_WIDTH, ctx->bg);
@@ -1020,7 +1041,6 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		UnloadTexture(ctx->font.texture);
 		if (ctx->window_size.w < 480) ctx->font = LoadFont_lora_sb_1_inc();
 		else                          ctx->font = LoadFont_lora_sb_0_inc();
-		ctx->font_size = ctx->font.baseSize;
 	}
 
 	if (!IsShaderReady(ctx->picker_shader)) {
