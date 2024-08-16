@@ -423,6 +423,13 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 		ctx->is.buf_len--;
 	}
 
+	if ((IsKeyPressed(KEY_DELETE) || IsKeyPressedRepeat(KEY_DELETE)) &&
+	    ctx->is.cursor < ctx->is.buf_len) {
+		mem_move(ctx->is.buf + ctx->is.cursor + 1,
+		         ctx->is.buf + ctx->is.cursor,
+		         ctx->is.buf_len - ctx->is.cursor);
+	}
+
 	if (IsKeyPressed(KEY_ENTER)) {
 		parse_and_store_text_input(ctx);
 		ctx->is.idx = -1;
