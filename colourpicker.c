@@ -428,6 +428,7 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 		mem_move(ctx->is.buf + ctx->is.cursor + 1,
 		         ctx->is.buf + ctx->is.cursor,
 		         ctx->is.buf_len - ctx->is.cursor);
+		ctx->is.buf_len--;
 	}
 
 	if (IsKeyPressed(KEY_ENTER)) {
