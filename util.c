@@ -364,10 +364,43 @@ parse_hex_u32(char *s)
 	return res;
 }
 
-static f32
-parse_f32(char *s)
+static f64
+parse_f64(s8 s)
 {
-	return atof(s);
+	f64 integral = 0, fractional = 0, sign = 1;
+
+	if (s.len && *s.data == '-') {
+		sign *= -1;
+		s.data++;
+		s.len--;
+	}
+
+	while (s.len && ISDIGIT(*s.data)) {
+		integral *= 10;
+		integral += *s.data - '0';
+		s.data++;
+		s.len--;
+	}
+
+	if (s.len && *s.data == '.') { s.data++; s.len--; }
+
+	while (s.len) {
+		ASSERT(s.data[s.len - 1] != '.');
+		fractional *= 0.1f;
+		fractional += (s.data[--s.len] - '0') * 0.1f;
+	}
+
+	f64 result = sign * (integral + fractional);
+
+	return result;
+}
+
+static s8
+cstr_to_s8(char *s)
+{
+	s8 result = {.data = s};
+	if (s) while (*s) { result.len++; s++; }
+	return result;
 }
 
 #endif /* _UTIL_C_ */

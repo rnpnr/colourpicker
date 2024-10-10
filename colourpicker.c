@@ -271,6 +271,7 @@ get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 static void
 parse_and_store_text_input(ColourPickerCtx *ctx)
 {
+	s8 input = {.len = ctx->is.buf_len, .data = ctx->is.buf};
 	v4   new_colour = {0};
 	enum colour_mode new_mode = CM_LAST;
 	if (ctx->is.idx == -1) {
@@ -281,7 +282,7 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 	} else {
 		new_mode   = ctx->colour_mode;
 		new_colour = ctx->colour;
-		f32 fv = parse_f32(ctx->is.buf);
+		f32 fv = parse_f64(input);
 		CLAMP01(fv);
 		switch(ctx->is.idx) {
 		case INPUT_R: new_colour.r = fv; break;
