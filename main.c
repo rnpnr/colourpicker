@@ -130,7 +130,7 @@ main(i32 argc, char *argv[])
 
 				switch (argv[i][1]) {
 				case 'h':
-					rgb = normalize_colour(parse_hex_u32(argv[i + 1]));
+					rgb = normalize_colour(parse_hex_u32(cstr_to_s8(argv[i + 1])));
 					ctx.colour = rgb_to_hsv(rgb);
 					break;
 				case 'r': rgb.r = parse_f64(cstr_to_s8(argv[i + 1])); CLAMP01(rgb.r); break;

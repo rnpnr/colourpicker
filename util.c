@@ -33,8 +33,8 @@ typedef float     f32;
 typedef double    f64;
 typedef ptrdiff_t size;
 
-typedef struct { size len; char *data; } s8;
-#define s8(s) (s8){.len = sizeof(s) - 1, .data = s}
+typedef struct { size len; u8 *data; } s8;
+#define s8(s) (s8){.len = sizeof(s) - 1, .data = (u8 *)s}
 
 typedef union {
 	struct { u32 w, h; };
@@ -157,7 +157,7 @@ typedef struct {
 	f32  cursor_t;
 	f32  cursor_t_target;
 	i32  buf_len;
-	char buf[64];
+	u8   buf[64];
 } InputState;
 
 #ifdef _DEBUG
@@ -341,22 +341,24 @@ pack_rl_colour(Color colour)
 }
 
 static u32
-parse_hex_u32(char *s)
+parse_hex_u32(s8 s)
 {
 	u32 res = 0;
 
 	/* NOTE: skip over '0x' or '0X' */
-	if (*s == '0' && (*(s + 1) == 'x' || *(s + 1) == 'X'))
-		s += 2;
+	if (s.len > 2 && s.data[0] == '0' && (s.data[1] == 'x' || s.data[1] == 'X')) {
+		s.data += 2;
+		s.len  -= 2;
+	}
 
-	for (; *s; s++) {
+	for (; s.len > 0; s.len--, s.data++) {
 		res <<= 4;
-		if (ISDIGIT(*s)) {
-			res |= *s - '0';
-		} else if (ISHEX(*s)) {
+		if (ISDIGIT(*s.data)) {
+			res |= *s.data - '0';
+		} else if (ISHEX(*s.data)) {
 			/* NOTE: convert to lowercase first then convert to value */
-			*s  |= 0x20;
-			res |= *s - 0x57;
+			*s.data |= 0x20;
+			res     |= *s.data - 0x57;
 		} else {
 			/* NOTE: do nothing (treat invalid value as 0) */
 		}
@@ -398,7 +400,7 @@ parse_f64(s8 s)
 static s8
 cstr_to_s8(char *s)
 {
-	s8 result = {.data = s};
+	s8 result = {.data = (u8 *)s};
 	if (s) while (*s) { result.len++; s++; }
 	return result;
 }

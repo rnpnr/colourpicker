@@ -11,7 +11,7 @@ static s8 mode_labels[CM_LAST][4] = {
 };
 
 static void
-mem_move(char *src, char *dest, size n)
+mem_move(u8 *src, u8 *dest, size n)
 {
 	if (dest < src) while (n) { *dest++ = *src++; n--; }
 	else            while (n) { n--; dest[n] = src[n]; }
@@ -277,7 +277,7 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 	if (ctx->is.idx == -1) {
 		return;
 	} else if (ctx->is.idx == INPUT_HEX) {
-		new_colour = normalize_colour(parse_hex_u32(ctx->is.buf));
+		new_colour = normalize_colour(parse_hex_u32(input));
 		new_mode   = CM_RGB;
 	} else {
 		new_mode   = ctx->colour_mode;
@@ -305,7 +305,7 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 
 	if (idx == INPUT_HEX) {
 		Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-		ctx->is.buf_len = snprintf(ctx->is.buf, ARRAY_COUNT(ctx->is.buf),
+		ctx->is.buf_len = snprintf((char *)ctx->is.buf, ARRAY_COUNT(ctx->is.buf),
 		                           "%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 	} else {
 		f32 fv = 0;
@@ -316,7 +316,7 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 		case INPUT_A: fv = ctx->colour.a; break;
 		default: break;
 		}
-		ctx->is.buf_len = snprintf(ctx->is.buf, ARRAY_COUNT(ctx->is.buf), "%0.02f", fv);
+		ctx->is.buf_len = snprintf((char *)ctx->is.buf, ARRAY_COUNT(ctx->is.buf), "%0.02f", fv);
 	}
 
 	ctx->is.idx    = idx;
@@ -338,7 +338,7 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 
 	i32 buf_delta = ctx->is.buf_len - max_disp_chars;
 	if (buf_delta < 0) buf_delta = 0;
-	s8 buf = {.len = ctx->is.buf_len - buf_delta, .data =ctx->is.buf + buf_delta};
+	s8 buf = {.len = ctx->is.buf_len - buf_delta, .data = ctx->is.buf + buf_delta};
 	{
 		/* NOTE: drop a char if the subtext still doesn't fit */
 		v2 nts = measure_text(ctx->font, buf);
@@ -394,10 +394,8 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 	/* NOTE: handle multiple input keys on a single frame */
 	i32 key = GetCharPressed();
 	while (key > 0) {
-		if (ctx->is.buf_len == (ARRAY_COUNT(ctx->is.buf) - 1)) {
-			ctx->is.buf[ARRAY_COUNT(ctx->is.buf) - 1] = 0;
+		if (ctx->is.buf_len == ARRAY_COUNT(ctx->is.buf))
 			break;
-		}
 
 		mem_move(ctx->is.buf + ctx->is.cursor,
 		         ctx->is.buf + ctx->is.cursor + 1,
@@ -553,7 +551,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 			set_text_input_idx(ctx, label_idx + 1, vr, relative_mouse);
 
 		if (ctx->is.idx != (label_idx + 1)) {
-			s8 value = {.len = 4, .data = (char *)TextFormat("%0.02f", current)};
+			s8 value = {.len = 4, .data = (u8 *)TextFormat("%0.02f", current)};
 			draw_text(ctx->font, value, left_align_text_in_rect(vr, value, ctx->font), colour_rl);
 		} else {
 			do_text_input(ctx, vr, colour_rl, 4);
@@ -587,7 +585,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	if (mouse_mask & MOUSE_RIGHT) step_colour_mode(ctx, -1);
 
 	Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-	s8 hex   = {.len = 8, .data = (char *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a)};
+	s8 hex   = {.len = 8, .data = (u8 *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a)};
 	s8 label = s8("RGB: ");
 
 	v2 label_size = measure_text(ctx->font, label);
@@ -605,7 +603,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		set_text_input_idx(ctx, -1, hex_r, relative_mouse);
 		hc       = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-		hex.data = (char *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+		hex.data = (u8 *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
 	}
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
@@ -1230,8 +1228,8 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		btn_r.pos.y += 0.54 * mb.size.h;
 
 		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, s8("Paste"), fg, bg)) {
-			char *txt = (char *)GetClipboardText();
-			if (txt) {
+			s8 txt = cstr_to_s8((char *)GetClipboardText());
+			if (txt.len) {
 				v4 new_colour = normalize_colour(parse_hex_u32(txt));
 				store_formatted_colour(ctx, new_colour, CM_RGB);
 				if (ctx->mode == CPM_PICKER) {
