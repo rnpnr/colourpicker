@@ -1,7 +1,6 @@
 /* See LICENSE for copyright details */
 #include <raylib.h>
 #include <rlgl.h>
-#include <stdio.h>
 
 #include "util.c"
 
@@ -303,10 +302,9 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 	if (ctx->is.idx != (i32)idx)
 		parse_and_store_text_input(ctx);
 
+	Stream in = {.data = ctx->is.buf, .cap = ARRAY_COUNT(ctx->is.buf)};
 	if (idx == INPUT_HEX) {
-		Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-		ctx->is.buf_len = snprintf((char *)ctx->is.buf, ARRAY_COUNT(ctx->is.buf),
-		                           "%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+		stream_append_colour(&in, colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
 	} else {
 		f32 fv = 0;
 		switch (idx) {
@@ -316,8 +314,9 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 		case INPUT_A: fv = ctx->colour.a; break;
 		default: break;
 		}
-		ctx->is.buf_len = snprintf((char *)ctx->is.buf, ARRAY_COUNT(ctx->is.buf), "%0.02f", fv);
+		stream_append_f64(&in, fv, 100);
 	}
+	ctx->is.buf_len = in.widx;
 
 	ctx->is.idx    = idx;
 	ctx->is.cursor = -1;
@@ -551,7 +550,10 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 			set_text_input_idx(ctx, label_idx + 1, vr, relative_mouse);
 
 		if (ctx->is.idx != (label_idx + 1)) {
-			s8 value = {.len = 4, .data = (u8 *)TextFormat("%0.02f", current)};
+			u8 vbuf[4];
+			Stream vstream = {.data = vbuf, .cap = ARRAY_COUNT(vbuf)};
+			stream_append_f64(&vstream, current, 100);
+			s8 value = {.len = vstream.widx, .data = vbuf};
 			draw_text(ctx->font, value, left_align_text_in_rect(vr, value, ctx->font), colour_rl);
 		} else {
 			do_text_input(ctx, vr, colour_rl, 4);
@@ -584,8 +586,10 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	if (mouse_mask & MOUSE_LEFT)  step_colour_mode(ctx, 1);
 	if (mouse_mask & MOUSE_RIGHT) step_colour_mode(ctx, -1);
 
-	Color hc = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-	s8 hex   = {.len = 8, .data = (u8 *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a)};
+	u8 hbuf[8];
+	Stream hstream = {.data = hbuf, .cap = ARRAY_COUNT(hbuf)};
+	stream_append_colour(&hstream, colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
+	s8 hex   = {.len = hstream.widx, .data = hbuf};
 	s8 label = s8("RGB: ");
 
 	v2 label_size = measure_text(ctx->font, label);
@@ -602,8 +606,9 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	if (!hex_collides && ctx->is.idx == INPUT_HEX &&
 	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		set_text_input_idx(ctx, -1, hex_r, relative_mouse);
-		hc       = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-		hex.data = (u8 *)TextFormat("%02x%02x%02x%02x", hc.r, hc.g, hc.b, hc.a);
+		hstream.widx = 0;
+		stream_append_colour(&hstream, colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
+		hex.len = hstream.widx;
 	}
 
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
@@ -987,6 +992,10 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 	END_CYCLE_COUNT(CC_DO_PICKER);
 }
 
+
+#ifdef _DEBUG
+#include <stdio.h>
+#endif
 static void
 debug_dump_info(ColourPickerCtx *ctx)
 {
@@ -1223,8 +1232,13 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 
-		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, s8("Copy"), fg, bg))
-			SetClipboardText(TextFormat("%02x%02x%02x%02x", bg.r, bg.g, bg.b, bg.a));
+		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, s8("Copy"), fg, bg)) {
+			/* NOTE: SetClipboardText needs a NUL terminated string */
+			u8 cbuf[9] = {0};
+			Stream cstream = {.data = cbuf, .cap = ARRAY_COUNT(cbuf) - 1};
+			stream_append_colour(&cstream, bg);
+			SetClipboardText((char *)cbuf);
+		}
 		btn_r.pos.y += 0.54 * mb.size.h;
 
 		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, s8("Paste"), fg, bg)) {

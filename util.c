@@ -29,12 +29,21 @@ typedef int32_t   i32;
 typedef uint32_t  u32;
 typedef uint32_t  b32;
 typedef int64_t   i64;
+typedef uint64_t  u64;
 typedef float     f32;
 typedef double    f64;
 typedef ptrdiff_t size;
 
 typedef struct { size len; u8 *data; } s8;
 #define s8(s) (s8){.len = sizeof(s) - 1, .data = (u8 *)s}
+
+typedef struct {
+	u8  *data;
+	u32 cap;
+	u32 widx;
+	i32 fd;
+	b32 errors;
+} Stream;
 
 typedef union {
 	struct { u32 w, h; };
@@ -403,6 +412,81 @@ cstr_to_s8(char *s)
 	s8 result = {.data = (u8 *)s};
 	if (s) while (*s) { result.len++; s++; }
 	return result;
+}
+
+static void
+stream_append_byte(Stream *s, u8 b)
+{
+	s->errors |= s->widx + 1 > s->cap;
+	if (!s->errors)
+		s->data[s->widx++] = b;
+}
+
+static void
+stream_append_hex_u8(Stream *s, u32 n)
+{
+	static u8 hex[16] = {"0123456789abcdef"};
+	s->errors |= (s->cap - s->widx) < 2;
+	if (!s->errors) {
+		s->data[s->widx + 1] = hex[(n >> 0) & 0x0f];
+		s->data[s->widx + 0] = hex[(n >> 4) & 0x0f];
+		s->widx += 2;
+	}
+}
+
+static void
+stream_append_s8(Stream *s, s8 str)
+{
+	s->errors |= (s->cap - s->widx) < str.len;
+	if (!s->errors) {
+		for (size i = 0; i < str.len; i++)
+			s->data[s->widx++] = str.data[i];
+	}
+}
+
+static void
+stream_append_u64(Stream *s, u64 n)
+{
+	u8 tmp[64];
+	u8 *end = tmp + sizeof(tmp);
+	u8 *beg = end;
+	do { *--beg = '0' + (n % 10); } while (n /= 10);
+	stream_append_s8(s, (s8){.len = end - beg, .data = beg});
+}
+
+static void
+stream_append_f64(Stream *s, f64 f, i64 prec)
+{
+	if (f < 0) {
+		stream_append_byte(s, '-');
+		f *= -1;
+	}
+
+	/* NOTE: round last digit */
+	f += 0.5f / prec;
+
+	if (f >= (f64)(-1UL >> 1)) {
+		stream_append_s8(s, s8("inf"));
+	} else {
+		u64 integral = f;
+		u64 fraction = (f - integral) * prec;
+		stream_append_u64(s, integral);
+		stream_append_byte(s, '.');
+		for (u64 i = prec / 10; i > 1; i /= 10) {
+			if (i > fraction)
+				stream_append_byte(s, '0');
+		}
+		stream_append_u64(s, fraction);
+	}
+}
+
+static void
+stream_append_colour(Stream *s, Color c)
+{
+	stream_append_hex_u8(s, c.r);
+	stream_append_hex_u8(s, c.g);
+	stream_append_hex_u8(s, c.b);
+	stream_append_hex_u8(s, c.a);
 }
 
 #endif /* _UTIL_C_ */
