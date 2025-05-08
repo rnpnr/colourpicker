@@ -43,21 +43,6 @@ read_whole_file(char *name, str8 *mem)
 	return res;
 }
 
-function str8
-get_line(str8 *s)
-{
-	str8 res = {.data = s->data};
-	while (s->len && s->data[0] != '\n') {
-		s->data++;
-		s->len--;
-		res.len++;
-	}
-	/* NOTE: skip over trailing \n */
-	s->data++;
-	s->len--;
-	return res;
-}
-
 /* NOTE: modified from raylib */
 function void
 export_font_as_code(char *font_path, char *output_name, int font_size, str8 mem)
@@ -153,37 +138,11 @@ main(void)
 	for (unsigned int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
 		str8 tmem = smem;
 		str8 rmem = smem;
-		size_t tlen  = snprintf((char *)tmem.data, tmem.len, "lora_sb_%d_inc.h", i);
+		size_t tlen  = snprintf((char *)tmem.data, tmem.len, "out/lora_sb_%d_inc.h", i);
 		rmem.len    -= (tlen + 1);
 		rmem.data   += (tlen + 1);
 		export_font_as_code("assets/Lora-SemiBold.ttf", (char *)tmem.data, font_sizes[i], rmem);
 	}
-
-	FILE *out_file = fopen("out/shader_inc.h", "w");
-	if (!out_file) {
-		fputs("Failed to open necessary files!\n", stdout);
-		return 1;
-	}
-
-	str8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME, &smem);
-	str8 s = shader_data;
-	/* NOTE: skip over license notice */
-	str8 line = get_line(&s);
-	fputs("static char *g_hsv_shader_text =\n\t", out_file);
-	do {
-		line = get_line(&s);
-		while (line.len && ISSPACE(*line.data)) {
-			line.data++;
-			line.len--;
-		}
-		if (line.len) {
-			fputc('"', out_file);
-			fwrite(line.data, 1, line.len, out_file);
-			fputs("\\n\"\n\t", out_file);
-		}
-	} while (s.len > 0);
-	fputs(";\n", out_file);
-	fclose(out_file);
 
 	return 0;
 }

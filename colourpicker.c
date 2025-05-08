@@ -1062,7 +1062,7 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 #ifdef _DEBUG
 		ctx->picker_shader   = LoadShader(0, HSV_LERP_SHADER_NAME);
 #else
-		ctx->picker_shader   = LoadShaderFromMemory(0, g_hsv_shader_text);
+		ctx->picker_shader   = LoadShaderFromMemory(0, _binary_slider_lerp_glsl_start);
 #endif
 		ctx->mode_id         = GetShaderLocation(ctx->picker_shader, "u_mode");
 		ctx->colour_mode_id  = GetShaderLocation(ctx->picker_shader, "u_colour_mode");
