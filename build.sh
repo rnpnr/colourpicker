@@ -2,61 +2,88 @@
 
 version=1.0
 
-cflags=${CFLAGS:-"-march=native -O3 -Wall -Wextra"}
-cflags="${cflags} -std=c11 -I./external/include -DVERSION=\"$version\""
+cflags=${CFLAGS:-"-march=native -O3"}
+cflags="${cflags} -std=c11 "
 ldflags=${LDFLAGS:-"-flto"}
-ldflags="$ldflags -lraylib -lm"
+ldflags="$ldflags -lm"
 
 output="colourpicker"
 
-debug=${DEBUG}
-
 cc=${CC:-cc}
-system_raylib=${USE_SYSTEM_RAYLIB:-$debug}
+
+for arg; do
+	case ${arg} in
+	debug) debug=1
+	esac
+done
 
 case $(uname -s) in
 MINGW64*)
+	w32=1
 	output="Colour Picker"
-	windres assets/colourpicker.rc assets/colourpicker.rc.o
-	ldflags="assets/colourpicker.rc.o $ldflags -mwindows -lgdi32 -lwinmm"
+	windres assets/colourpicker.rc out/colourpicker.rc.o
+	ldflags="out/colourpicker.rc.o ${ldflags} -mwindows -lgdi32 -lwinmm"
 	;;
 esac
 
-# NOTE: clones and builds a static raylib if system lib is not requested
-# NOTE: this requires cmake
-if [ "$system_raylib" ]; then
-	ldflags="-L/usr/local/lib $ldflags"
-else
-	if  [ ! -f external/lib/libraylib.a ]; then
-		git submodule update --init --checkout --depth=1 external/raylib
-		cmake --install-prefix="${PWD}/external" \
-		      -G "Ninja" -B external/raylib/build -S external/raylib \
-		      -D CMAKE_INSTALL_LIBDIR=lib -D CMAKE_BUILD_TYPE="Release" \
-		      -D CUSTOMIZE_BUILD=ON -D WITH_PIC=ON -D BUILD_EXAMPLES=OFF
-		cmake --build   external/raylib/build
-		cmake --install external/raylib/build
+build_raylib()
+{
+	cp external/raylib/src/raylib.h external/raylib/src/rlgl.h out/
+	src=external/raylib/src
+	srcs="rcore rglfw rshapes rtext rtextures utils"
+
+	raylib_cmd="${cflags} -I./external/raylib/src -DPLATFORM_DESKTOP_GLFW"
+	raylib_cmd="${raylib_cmd} -Wno-unused-but-set-variable -Wno-unused-parameter"
+	[ ! ${w32} ] && raylib_cmd="${raylib_cmd} -D_GLFW_X11"
+
+	if [ ${debug} ]; then
+		files=""
+		for n in ${srcs}; do
+			files="${files} ${src}/${n}.c"
+		done
+		raylib_cmd="${raylib_cmd} -DBUILD_LIBTYPE_SHARED -D_GLFW_BUILD_DLL"
+		raylib_cmd="${raylib_cmd} -fPIC -shared"
+		raylib_cmd="${raylib_cmd} ${files} -o ${raylib}"
+		[ ${w32} ] && raylib_cmd="${raylib_command} -L. -lgdi32 -lwinmm"
+		${cc} ${raylib_cmd}
+	else
+		outs=""
+		for n in ${srcs}; do
+			${cc} ${raylib_cmd} -c "${src}/${n}.c" -o "out/${n}.o"
+			outs="${outs} out/${n}.o"
+		done
+
+		ar rc "${raylib}" ${outs}
 	fi
-	ldflags="-L./external/lib $ldflags"
+}
+
+if [ $(git diff-index --quiet HEAD -- external/raylib) ]; then
+	git submodule update --init --checkout --depth=1 external/raylib
 fi
 
 [ ! -s "config.h" ] && cp config.def.h config.h
 
-if [ ! -e "external/include/shader_inc.h" ] || [ "slider_lerp.glsl" -nt "external/include/shader_inc.h" ]; then
-	${cc} $cflags -o gen_incs gen_incs.c $ldflags
+mkdir -p out
+raylib=out/libraylib.a
+[ ${debug} ] && raylib="libraylib.so"
+[ "./build.sh" -nt ${raylib} ] || [ ! -f ${raylib} ] && build_raylib
+
+cflags="${cflags} -Wall -Wextra -Iout"
+
+if [ ! -e "out/shader_inc.h" ] || [ "slider_lerp.glsl" -nt "out/shader_inc.h" ]; then
+	${cc} ${cflags} -o gen_incs gen_incs.c ${ldflags} ${raylib}
 	./gen_incs
-	mv lora_sb*.h external/include/
+	mv lora_sb*.h out/
 fi
 
 if [ "$debug" ]; then
 	# Hot Reloading/Debugging
-	cflags="$cflags -O0 -ggdb -D_DEBUG -Wno-unused-function"
-	# NOTE: needed for sync(3p)
-	cflags="$cflags -D_XOPEN_SOURCE=700"
+	cflags="${cflags} -O0 -ggdb -D_DEBUG -Wno-unused-function"
 
-	libcflags="$cflags -fPIC"
-	libldflags="$ldflags -shared"
-
-	${cc} $libcflags colourpicker.c -o libcolourpicker.so $libldflags
+	${cc} ${cflags} -fPIC -shared colourpicker.c -o colourpicker.so
+	ldflags="${ldflags} -Wl,-rpath,. ${raylib}"
+else
+	ldflags="${raylib} ${ldflags}"
 fi
 
-${cc} $cflags -o "$output" main.c $ldflags
+${cc} ${cflags} -DVERSION="\"${version}\"" main.c -o "${output}" ${ldflags}

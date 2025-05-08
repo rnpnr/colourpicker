@@ -159,7 +159,7 @@ main(void)
 		export_font_as_code("assets/Lora-SemiBold.ttf", (char *)tmem.data, font_sizes[i], rmem);
 	}
 
-	FILE *out_file = fopen("external/include/shader_inc.h", "w");
+	FILE *out_file = fopen("out/shader_inc.h", "w");
 	if (!out_file) {
 		fputs("Failed to open necessary files!\n", stdout);
 		return 1;

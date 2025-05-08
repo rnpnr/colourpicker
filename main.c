@@ -13,7 +13,7 @@
 
 typedef struct timespec Filetime;
 
-global const char *libname = "./libcolourpicker.so";
+global const char *libname = "./colourpicker.so";
 global void *libhandle;
 
 typedef void (do_colour_picker_fn)(ColourPickerCtx *, f32 dt, Vector2 window_pos, Vector2 mouse);
@@ -55,7 +55,6 @@ do_debug(void)
 	local_persist Filetime updated_time;
 	Filetime test_time = get_filetime(libname);
 	if (compare_filetime(test_time, updated_time)) {
-		sync();
 		load_library(libname);
 		updated_time = test_time;
 	}
