@@ -13,13 +13,13 @@
 
 typedef struct timespec Filetime;
 
-static const char *libname = "./libcolourpicker.so";
-static void *libhandle;
+global const char *libname = "./libcolourpicker.so";
+global void *libhandle;
 
 typedef void (do_colour_picker_fn)(ColourPickerCtx *, f32 dt, Vector2 window_pos, Vector2 mouse);
-static do_colour_picker_fn *do_colour_picker;
+global do_colour_picker_fn *do_colour_picker;
 
-static Filetime
+function Filetime
 get_filetime(const char *name)
 {
 	struct stat sb;
@@ -28,13 +28,13 @@ get_filetime(const char *name)
 	return sb.st_mtim;
 }
 
-static i32
+function s32
 compare_filetime(Filetime a, Filetime b)
 {
 	return (a.tv_sec - b.tv_sec) + (a.tv_nsec - b.tv_nsec);
 }
 
-static void
+function void
 load_library(const char *lib)
 {
 	/* NOTE: glibc is buggy gnuware so we need to check this */
@@ -49,10 +49,10 @@ load_library(const char *lib)
 		fprintf(stderr, "do_debug: dlsym: %s\n", dlerror());
 }
 
-static void
+function void
 do_debug(void)
 {
-	static Filetime updated_time;
+	local_persist Filetime updated_time;
 	Filetime test_time = get_filetime(libname);
 	if (compare_filetime(test_time, updated_time)) {
 		sync();
@@ -63,12 +63,12 @@ do_debug(void)
 }
 #else
 
-static void do_debug(void) { }
+#define do_debug(...)
 #include "colourpicker.c"
 
 #endif /* _DEBUG */
 
-static void __attribute__((noreturn))
+function void __attribute__((noreturn))
 usage(char *argv0)
 {
 	printf("usage: %s [-h ????????] [-r ?.??] [-g ?.??] [-b ?.??] [-a ?.??]\n"
@@ -77,8 +77,8 @@ usage(char *argv0)
 	exit(1);
 }
 
-int
-main(i32 argc, char *argv[])
+extern s32
+main(s32 argc, char *argv[])
 {
 	ColourPickerCtx ctx = {
 		.window_size = { .w = 640, .h = 860 },
@@ -118,7 +118,7 @@ main(i32 argc, char *argv[])
 
 	{
 		v4 rgb = hsv_to_rgb(ctx.colour);
-		for (i32 i = 1; i < argc; i++) {
+		for (s32 i = 1; i < argc; i++) {
 			if (argv[i][0] == '-') {
 				if (argv[i][1] == 'v') {
 					printf("colour picker %s\n", VERSION);
@@ -130,13 +130,13 @@ main(i32 argc, char *argv[])
 
 				switch (argv[i][1]) {
 				case 'h':
-					rgb = normalize_colour(parse_hex_u32(cstr_to_s8(argv[i + 1])));
+					rgb = normalize_colour(parse_hex_u32(str8_from_c_str(argv[i + 1])));
 					ctx.colour = rgb_to_hsv(rgb);
 					break;
-				case 'r': rgb.r = parse_f64(cstr_to_s8(argv[i + 1])); CLAMP01(rgb.r); break;
-				case 'g': rgb.g = parse_f64(cstr_to_s8(argv[i + 1])); CLAMP01(rgb.g); break;
-				case 'b': rgb.b = parse_f64(cstr_to_s8(argv[i + 1])); CLAMP01(rgb.b); break;
-				case 'a': rgb.a = parse_f64(cstr_to_s8(argv[i + 1])); CLAMP01(rgb.a); break;
+				case 'r': rgb.r = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.r); break;
+				case 'g': rgb.g = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.g); break;
+				case 'b': rgb.b = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.b); break;
+				case 'a': rgb.a = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.a); break;
 				default:  usage(argv[0]);                                 break;
 				}
 				i++;

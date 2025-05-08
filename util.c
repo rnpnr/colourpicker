@@ -5,14 +5,14 @@
 #include <stdint.h>
 
 typedef uint8_t   u8;
-typedef int32_t   i32;
+typedef int32_t   s32;
 typedef uint32_t  u32;
 typedef uint32_t  b32;
-typedef int64_t   i64;
+typedef int64_t   s64;
 typedef uint64_t  u64;
 typedef float     f32;
 typedef double    f64;
-typedef ptrdiff_t size;
+typedef ptrdiff_t sz;
 
 #define function      static
 #define global        static
@@ -54,17 +54,17 @@ rdtsc(void)
 #define DEBUG_EXPORT
 #else
 #define ASSERT(c)
-#define DEBUG_EXPORT static
+#define DEBUG_EXPORT function
 #endif
 
-typedef struct { size len; u8 *data; } s8;
-#define s8(s) (s8){.len = sizeof(s) - 1, .data = (u8 *)s}
+typedef struct { sz len; u8 *data; } str8;
+#define str8(s) (str8){.len = sizeof(s) - 1, .data = (u8 *)s}
 
 typedef struct {
 	u8  *data;
 	u32 cap;
 	u32 widx;
-	i32 fd;
+	s32 fd;
 	b32 errors;
 } Stream;
 
@@ -154,7 +154,7 @@ typedef struct {
 	ButtonState buttons[COLOUR_STACK_ITEMS];
 	v4  items[COLOUR_STACK_ITEMS];
 	v4  last;
-	i32 widx;
+	s32 widx;
 	f32 fade_param;
 	f32 y_off_t;
 	ButtonState tri_btn;
@@ -173,7 +173,7 @@ typedef struct {
 typedef struct {
 	ButtonState buttons[CPM_LAST];
 	f32 mode_visible_t;
-	i32 next_mode;
+	s32 next_mode;
 } ModeChangeState;
 
 typedef struct {
@@ -183,12 +183,12 @@ typedef struct {
 } PickerModeState;
 
 typedef struct {
-	i32  idx;
-	i32  cursor;
+	s32  idx;
+	s32  cursor;
 	f32  cursor_hover_p;
 	f32  cursor_t;
 	f32  cursor_t_target;
-	i32  buf_len;
+	s32  buf_len;
 	u8   buf[64];
 } InputState;
 
@@ -203,10 +203,10 @@ enum clock_counts {
 	CC_LAST
 };
 
-static struct {
-	i64 cpu_cycles[CC_LAST];
-	i64 total_cycles[CC_LAST];
-	i64 hit_count[CC_LAST];
+global struct {
+	s64 cpu_cycles[CC_LAST];
+	s64 total_cycles[CC_LAST];
+	s64 hit_count[CC_LAST];
 } g_debug_clock_counts;
 
 #define BEGIN_CYCLE_COUNT(cc_name) \
@@ -242,7 +242,7 @@ typedef struct {
 	StatusBarState  sbs;
 	ButtonState     buttons[2];
 
-	i32 held_idx;
+	s32 held_idx;
 
 	f32 selection_hover_t[2];
 	v4  hover_colour;
@@ -252,15 +252,16 @@ typedef struct {
 	RenderTexture slider_texture;
 	RenderTexture picker_texture;
 
-	i32 mode_id, colour_mode_id, colours_id;
-	i32 regions_id, radius_id, border_thick_id;
+	s32 mode_id, colour_mode_id, colours_id;
+	s32 regions_id, radius_id, border_thick_id;
 
 	u32  flags;
 	enum colour_mode        colour_mode;
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
-#define ARRAY_COUNT(a) (sizeof(a) / sizeof(*a))
+#define countof(a) (sizeof(a) / sizeof(*a))
+
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define MIN(a, b)      ((a) < (b) ? (a) : (b))
 #define MAX(a, b)      ((a) < (b) ? (b) : (a))
@@ -334,8 +335,8 @@ pack_rl_colour(Color colour)
 	return colour.r << 24 | colour.g << 16 | colour.b << 8 | colour.a << 0;
 }
 
-static u32
-parse_hex_u32(s8 s)
+function u32
+parse_hex_u32(str8 s)
 {
 	u32 res = 0;
 
@@ -360,8 +361,8 @@ parse_hex_u32(s8 s)
 	return res;
 }
 
-static f64
-parse_f64(s8 s)
+function f64
+parse_f64(str8 s)
 {
 	f64 integral = 0, fractional = 0, sign = 1;
 
@@ -391,15 +392,18 @@ parse_f64(s8 s)
 	return result;
 }
 
-static s8
-cstr_to_s8(char *s)
+function str8
+str8_from_c_str(char *s)
 {
-	s8 result = {.data = (u8 *)s};
-	if (s) while (*s) { result.len++; s++; }
+	str8 result = {.data = (u8 *)s};
+	if (s) {
+		while (*s) s++;
+		result.len = (u8 *)s - result.data;
+	}
 	return result;
 }
 
-static void
+function void
 stream_append_byte(Stream *s, u8 b)
 {
 	s->errors |= s->widx + 1 > s->cap;
@@ -407,10 +411,10 @@ stream_append_byte(Stream *s, u8 b)
 		s->data[s->widx++] = b;
 }
 
-static void
+function void
 stream_append_hex_u8(Stream *s, u32 n)
 {
-	static u8 hex[16] = {"0123456789abcdef"};
+	local_persist u8 hex[16] = {"0123456789abcdef"};
 	s->errors |= (s->cap - s->widx) < 2;
 	if (!s->errors) {
 		s->data[s->widx + 1] = hex[(n >> 0) & 0x0f];
@@ -419,28 +423,28 @@ stream_append_hex_u8(Stream *s, u32 n)
 	}
 }
 
-static void
-stream_append_s8(Stream *s, s8 str)
+function void
+stream_append_str8(Stream *s, str8 str)
 {
 	s->errors |= (s->cap - s->widx) < str.len;
 	if (!s->errors) {
-		for (size i = 0; i < str.len; i++)
+		for (sz i = 0; i < str.len; i++)
 			s->data[s->widx++] = str.data[i];
 	}
 }
 
-static void
+function void
 stream_append_u64(Stream *s, u64 n)
 {
 	u8 tmp[64];
 	u8 *end = tmp + sizeof(tmp);
 	u8 *beg = end;
 	do { *--beg = '0' + (n % 10); } while (n /= 10);
-	stream_append_s8(s, (s8){.len = end - beg, .data = beg});
+	stream_append_str8(s, (str8){.len = end - beg, .data = beg});
 }
 
-static void
-stream_append_f64(Stream *s, f64 f, i64 prec)
+function void
+stream_append_f64(Stream *s, f64 f, s64 prec)
 {
 	if (f < 0) {
 		stream_append_byte(s, '-');
@@ -451,7 +455,7 @@ stream_append_f64(Stream *s, f64 f, i64 prec)
 	f += 0.5f / prec;
 
 	if (f >= (f64)(-1UL >> 1)) {
-		stream_append_s8(s, s8("inf"));
+		stream_append_str8(s, str8("inf"));
 	} else {
 		u64 integral = f;
 		u64 fraction = (f - integral) * prec;
@@ -465,7 +469,7 @@ stream_append_f64(Stream *s, f64 f, i64 prec)
 	}
 }
 
-static void
+function void
 stream_append_colour(Stream *s, Color c)
 {
 	stream_append_hex_u8(s, c.r);

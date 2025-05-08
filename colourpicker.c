@@ -4,19 +4,19 @@
 
 #include "util.c"
 
-static s8 mode_labels[CM_LAST][4] = {
-	[CM_RGB] = { s8("R"), s8("G"), s8("B"), s8("A") },
-	[CM_HSV] = { s8("H"), s8("S"), s8("V"), s8("A") },
+global str8 mode_labels[CM_LAST][4] = {
+	[CM_RGB] = { str8("R"), str8("G"), str8("B"), str8("A") },
+	[CM_HSV] = { str8("H"), str8("S"), str8("V"), str8("A") },
 };
 
-static void
-mem_move(u8 *src, u8 *dest, size n)
+function void
+mem_move(u8 *src, u8 *dest, sz n)
 {
 	if (dest < src) while (n) { *dest++ = *src++; n--; }
 	else            while (n) { n--; dest[n] = src[n]; }
 }
 
-static f32
+function f32
 move_towards_f32(f32 current, f32 target, f32 delta)
 {
 	if (target < current) {
@@ -31,38 +31,38 @@ move_towards_f32(f32 current, f32 target, f32 delta)
 	return current;
 }
 
-static Color
+function Color
 fade(Color a, f32 alpha)
 {
 	a.a = (u8)((f32)a.a * alpha);
 	return a;
 }
 
-static f32
+function f32
 lerp(f32 a, f32 b, f32 t)
 {
 	return a + t * (b - a);
 }
 
-static v4
+function v4
 lerp_v4(v4 a, v4 b, f32 t)
 {
-	return (v4){
-		.x = a.x + t * (b.x - a.x),
-		.y = a.y + t * (b.y - a.y),
-		.z = a.z + t * (b.z - a.z),
-		.w = a.w + t * (b.w - a.w),
-	};
+	v4 result;
+	result.x = a.x + t * (b.x - a.x);
+	result.y = a.y + t * (b.y - a.y);
+	result.z = a.z + t * (b.z - a.z);
+	result.w = a.w + t * (b.w - a.w);
+	return result;
 }
 
-static v2
-measure_text(Font font, s8 text)
+function v2
+measure_text(Font font, str8 text)
 {
 	v2 result = {.y = font.baseSize};
 
-	for (size i = 0; i < text.len; i++) {
+	for (sz i = 0; i < text.len; i++) {
 		/* NOTE: assumes font glyphs are ordered (they are in our embedded fonts) */
-		i32 idx   = (i32)text.data[i] - 32;
+		s32 idx   = (s32)text.data[i] - 32;
 		result.x += font.glyphs[idx].advanceX;
 		if (font.glyphs[idx].advanceX == 0)
 			result.x += (font.recs[idx].width + font.glyphs[idx].offsetX);
@@ -71,12 +71,12 @@ measure_text(Font font, s8 text)
 	return result;
 }
 
-static void
-draw_text(Font font, s8 text, v2 pos, Color colour)
+function void
+draw_text(Font font, str8 text, v2 pos, Color colour)
 {
-	for (size i = 0; i < text.len; i++) {
+	for (sz i = 0; i < text.len; i++) {
 		/* NOTE: assumes font glyphs are ordered (they are in our embedded fonts) */
-		i32 idx = text.data[i] - 32;
+		s32 idx = text.data[i] - 32;
 		Rectangle dst = {
 			pos.x + font.glyphs[idx].offsetX - font.glyphPadding,
 			pos.y + font.glyphs[idx].offsetY - font.glyphPadding,
@@ -97,15 +97,15 @@ draw_text(Font font, s8 text, v2 pos, Color colour)
 	}
 }
 
-static v2
-left_align_text_in_rect(Rect r, s8 text, Font font)
+function v2
+left_align_text_in_rect(Rect r, str8 text, Font font)
 {
 	v2 ts    = measure_text(font, text);
 	v2 delta = { .h = r.size.h - ts.h };
 	return (v2) { .x = r.pos.x, .y = r.pos.y + 0.5 * delta.h, };
 }
 
-static Rect
+function Rect
 scale_rect_centered(Rect r, v2 scale)
 {
 	Rect or   = r;
@@ -116,8 +116,8 @@ scale_rect_centered(Rect r, v2 scale)
 	return r;
 }
 
-static v2
-center_align_text_in_rect(Rect r, s8 text, Font font)
+function v2
+center_align_text_in_rect(Rect r, str8 text, Font font)
 {
 	v2 ts    = measure_text(font, text);
 	v2 delta = { .w = r.size.w - ts.w, .h = r.size.h - ts.h };
@@ -127,7 +127,7 @@ center_align_text_in_rect(Rect r, s8 text, Font font)
 	};
 }
 
-static Rect
+function Rect
 cut_rect_middle(Rect r, f32 left, f32 right)
 {
 	ASSERT(left <= right);
@@ -136,14 +136,14 @@ cut_rect_middle(Rect r, f32 left, f32 right)
 	return r;
 }
 
-static Rect
+function Rect
 cut_rect_left(Rect r, f32 fraction)
 {
 	r.size.w *= fraction;
 	return r;
 }
 
-static Rect
+function Rect
 cut_rect_right(Rect r, f32 fraction)
 {
 	r.pos.x  += fraction * r.size.w;
@@ -151,7 +151,7 @@ cut_rect_right(Rect r, f32 fraction)
 	return r;
 }
 
-static void
+function void
 draw_cardinal_triangle(v2 midpoint, v2 size, v2 scale, enum cardinal_direction direction,
                        Color colour)
 {
@@ -192,7 +192,7 @@ draw_cardinal_triangle(v2 midpoint, v2 size, v2 scale, enum cardinal_direction d
 	#endif
 }
 
-static v4
+function v4
 get_formatted_colour(ColourPickerCtx *ctx, enum colour_mode format)
 {
 	switch (ctx->colour_mode) {
@@ -215,7 +215,7 @@ get_formatted_colour(ColourPickerCtx *ctx, enum colour_mode format)
 	return (v4){0};
 }
 
-static void
+function void
 store_formatted_colour(ColourPickerCtx *ctx, v4 colour, enum colour_mode format)
 {
 	switch (ctx->colour_mode) {
@@ -238,8 +238,8 @@ store_formatted_colour(ColourPickerCtx *ctx, v4 colour, enum colour_mode format)
 	}
 }
 
-static void
-step_colour_mode(ColourPickerCtx *ctx, i32 inc)
+function void
+step_colour_mode(ColourPickerCtx *ctx, s32 inc)
 {
 	ASSERT(inc == 1 || inc == -1);
 
@@ -255,7 +255,7 @@ step_colour_mode(ColourPickerCtx *ctx, i32 inc)
 	store_formatted_colour(ctx, ctx->colour, last_mode);
 }
 
-static void
+function void
 get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 {
 	if (label) *label = cut_rect_left(r, 0.08);
@@ -267,10 +267,10 @@ get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 	}
 }
 
-static void
+function void
 parse_and_store_text_input(ColourPickerCtx *ctx)
 {
-	s8 input = {.len = ctx->is.buf_len, .data = ctx->is.buf};
+	str8 input = {.len = ctx->is.buf_len, .data = ctx->is.buf};
 	v4   new_colour = {0};
 	enum colour_mode new_mode = CM_LAST;
 	if (ctx->is.idx == -1) {
@@ -296,13 +296,13 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 		store_formatted_colour(ctx, new_colour, new_mode);
 }
 
-static void
+function void
 set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mouse)
 {
-	if (ctx->is.idx != (i32)idx)
+	if (ctx->is.idx != (s32)idx)
 		parse_and_store_text_input(ctx);
 
-	Stream in = {.data = ctx->is.buf, .cap = ARRAY_COUNT(ctx->is.buf)};
+	Stream in = {.data = ctx->is.buf, .cap = countof(ctx->is.buf)};
 	if (idx == INPUT_HEX) {
 		stream_append_colour(&in, rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
 	} else {
@@ -329,15 +329,15 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 	CLAMP01(ctx->is.cursor_hover_p);
 }
 
-static void
-do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
+function void
+do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, s32 max_disp_chars)
 {
-	v2 ts  = measure_text(ctx->font, (s8){.len = ctx->is.buf_len, .data = ctx->is.buf});
+	v2 ts  = measure_text(ctx->font, (str8){.len = ctx->is.buf_len, .data = ctx->is.buf});
 	v2 pos = {.x = r.pos.x, .y = r.pos.y + (r.size.y - ts.y) / 2};
 
-	i32 buf_delta = ctx->is.buf_len - max_disp_chars;
+	s32 buf_delta = ctx->is.buf_len - max_disp_chars;
 	if (buf_delta < 0) buf_delta = 0;
-	s8 buf = {.len = ctx->is.buf_len - buf_delta, .data = ctx->is.buf + buf_delta};
+	str8 buf = {.len = ctx->is.buf_len - buf_delta, .data = ctx->is.buf + buf_delta};
 	{
 		/* NOTE: drop a char if the subtext still doesn't fit */
 		v2 nts = measure_text(ctx->font, buf);
@@ -365,10 +365,10 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 		/* NOTE: extra offset to help with putting a cursor at idx 0 */
 		#define TEXT_HALF_CHAR_WIDTH 10
 		f32 x_off = TEXT_HALF_CHAR_WIDTH, x_bounds = r.size.w * ctx->is.cursor_hover_p;
-		i32 i;
+		s32 i;
 		for (i = 0; i < ctx->is.buf_len && x_off < x_bounds; i++) {
 			/* NOTE: assumes font glyphs are ordered */
-			i32 idx = ctx->is.buf[i] - 32;
+			s32 idx = ctx->is.buf[i] - 32;
 			x_off  += ctx->font.glyphs[idx].advanceX;
 			if (ctx->font.glyphs[idx].advanceX == 0)
 				x_off += ctx->font.recs[idx].width;
@@ -391,9 +391,9 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 	DrawRectangleRec(cursor_r.rr, cursor_colour);
 
 	/* NOTE: handle multiple input keys on a single frame */
-	i32 key = GetCharPressed();
+	s32 key = GetCharPressed();
 	while (key > 0) {
-		if (ctx->is.buf_len == ARRAY_COUNT(ctx->is.buf))
+		if (ctx->is.buf_len == countof(ctx->is.buf))
 			break;
 
 		mem_move(ctx->is.buf + ctx->is.cursor,
@@ -435,11 +435,11 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 	}
 }
 
-static i32
+function s32
 do_button(ButtonState *btn, v2 mouse, Rect r, f32 dt, f32 hover_speed)
 {
 	b32 hovered       = CheckCollisionPointRec(mouse.rv, r.rr);
-	i32 pressed_mask  = 0;
+	s32 pressed_mask  = 0;
 	pressed_mask     |= MOUSE_LEFT  * (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
 	pressed_mask     |= MOUSE_RIGHT * (hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT));
 
@@ -450,10 +450,10 @@ do_button(ButtonState *btn, v2 mouse, Rect r, f32 dt, f32 hover_speed)
 	return pressed_mask;
 }
 
-static i32
+function s32
 do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_speed, f32 scale_target, f32 fade_t)
 {
-	i32 pressed_mask = do_button(btn, mouse, r, dt, hover_speed);
+	s32 pressed_mask = do_button(btn, mouse, r, dt, hover_speed);
 
 	f32 param  = lerp(1, scale_target, btn->hover_t);
 	v2  bscale = (v2){
@@ -468,10 +468,10 @@ do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_s
 	return pressed_mask;
 }
 
-static i32
-do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, s8 text, v4 fg, Color bg)
+function s32
+do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, str8 text, v4 fg, Color bg)
 {
-	i32 pressed_mask = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
+	s32 pressed_mask = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
 
 	v2 tpos   = center_align_text_in_rect(r, text, ctx->font);
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
@@ -483,8 +483,8 @@ do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, s8 text
 	return pressed_mask;
 }
 
-static void
-do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
+function void
+do_slider(ColourPickerCtx *ctx, Rect r, s32 label_idx, v2 relative_mouse)
 {
 	Rect lr, sr, vr;
 	get_slider_subrects(r, &lr, &sr, &vr);
@@ -551,30 +551,30 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 
 		if (ctx->is.idx != (label_idx + 1)) {
 			u8 vbuf[4];
-			Stream vstream = {.data = vbuf, .cap = ARRAY_COUNT(vbuf)};
+			Stream vstream = {.data = vbuf, .cap = countof(vbuf)};
 			stream_append_f64(&vstream, current, 100);
-			s8 value = {.len = vstream.widx, .data = vbuf};
+			str8 value = {.len = vstream.widx, .data = vbuf};
 			draw_text(ctx->font, value, left_align_text_in_rect(vr, value, ctx->font), colour_rl);
 		} else {
 			do_text_input(ctx, vr, colour_rl, 4);
 		}
 	}
 
-	s8 label = mode_labels[ctx->colour_mode][label_idx];
+	str8 label = mode_labels[ctx->colour_mode][label_idx];
 	draw_text(ctx->font, label, center_align_text_in_rect(lr, label, ctx->font), ctx->fg);
 }
 
-static void
+function void
 do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 {
 	Rect hex_r  = cut_rect_left(r, 0.5);
 	Rect mode_r;
 	get_slider_subrects(r, 0, 0, &mode_r);
 
-	s8 mode_txt = s8("");
+	str8 mode_txt = str8("");
 	switch (ctx->colour_mode) {
-	case CM_RGB:  mode_txt = s8("RGB"); break;
-	case CM_HSV:  mode_txt = s8("HSV"); break;
+	case CM_RGB:  mode_txt = str8("RGB"); break;
+	case CM_HSV:  mode_txt = str8("HSV"); break;
 	case CM_LAST: ASSERT(0);            break;
 	}
 
@@ -582,15 +582,15 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	mode_r.pos.y  += (mode_r.size.h - mode_ts.h) / 2;
 	mode_r.size.w  = mode_ts.w;
 
-	i32 mouse_mask = do_button(&ctx->sbs.mode, relative_mouse, mode_r, ctx->dt, TEXT_HOVER_SPEED);
+	s32 mouse_mask = do_button(&ctx->sbs.mode, relative_mouse, mode_r, ctx->dt, TEXT_HOVER_SPEED);
 	if (mouse_mask & MOUSE_LEFT)  step_colour_mode(ctx, 1);
 	if (mouse_mask & MOUSE_RIGHT) step_colour_mode(ctx, -1);
 
 	u8 hbuf[8];
-	Stream hstream = {.data = hbuf, .cap = ARRAY_COUNT(hbuf)};
+	Stream hstream = {.data = hbuf, .cap = countof(hbuf)};
 	stream_append_colour(&hstream, rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
-	s8 hex   = {.len = hstream.widx, .data = hbuf};
-	s8 label = s8("RGB: ");
+	str8 hex   = {.len = hstream.widx, .data = hbuf};
+	str8 label = str8("RGB: ");
 
 	v2 label_size = measure_text(ctx->font, label);
 	v2 hex_size   = measure_text(ctx->font, hex);
@@ -601,7 +601,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	Rect label_r = cut_rect_left(hex_r,  label_size.x / hex_r.size.w);
 	hex_r        = cut_rect_right(hex_r, label_size.x / hex_r.size.w);
 
-	i32 hex_collides = CheckCollisionPointRec(relative_mouse.rv, hex_r.rr);
+	s32 hex_collides = CheckCollisionPointRec(relative_mouse.rv, hex_r.rr);
 
 	if (!hex_collides && ctx->is.idx == INPUT_HEX &&
 	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -636,7 +636,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	draw_text(ctx->font, mode_txt, mode_r.pos, rl_colour_from_normalized(mode_colour));
 }
 
-static void
+function void
 do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 {
 	ColourStackState *css = &ctx->colour_stack;
@@ -646,7 +646,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	sa.pos.y += 0.02 * sa.size.h;
 
 	Rect r    = sa;
-	r.size.h *= 1.0 / (ARRAY_COUNT(css->items) + 3);
+	r.size.h *= 1.0 / (countof(css->items) + 3);
 	r.size.w *= 0.75;
 	r.pos.x  += (sa.size.w - r.size.w) * 0.5;
 
@@ -661,11 +661,11 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 		r.pos.y += y_pos_delta;
 	}
 
-	f32 stack_scale_target = (f32)(ARRAY_COUNT(css->items) + 1) / ARRAY_COUNT(css->items);
+	f32 stack_scale_target = (f32)(countof(css->items) + 1) / countof(css->items);
 
-	f32 fade_scale[ARRAY_COUNT(css->items)] = { [ARRAY_COUNT(css->items) - 1] = 1 };
-	for (u32 i = 0; i < ARRAY_COUNT(css->items); i++) {
-		i32 cidx    = (css->widx + i) % ARRAY_COUNT(css->items);
+	f32 fade_scale[countof(css->items)] = { [countof(css->items) - 1] = 1 };
+	for (u32 i = 0; i < countof(css->items); i++) {
+		s32 cidx    = (css->widx + i) % countof(css->items);
 		Color bg    = rl_colour_from_normalized(css->items[cidx]);
 		b32 pressed = do_rect_button(css->buttons + cidx, ctx->mouse_pos, r, bg, ctx->dt,
 		                             BUTTON_HOVER_SPEED, stack_scale_target,
@@ -703,12 +703,12 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 		css->fade_param         = 1.0;
 		css->last               = css->items[css->widx];
 		css->items[css->widx++] = get_formatted_colour(ctx, CM_RGB);
-		if (css->widx == ARRAY_COUNT(css->items))
+		if (css->widx == countof(css->items))
 			css->widx = 0;
 	}
 }
 
-static void
+function void
 do_colour_selector(ColourPickerCtx *ctx, Rect r)
 {
 	Color colour  = rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
@@ -719,10 +719,10 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	DrawRectangleRec(cs[1].rr, colour);
 
 	v4 fg        = normalize_colour(pack_rl_colour(ctx->fg));
-	s8 labels[2] = {s8("Revert"), s8("Apply")};
+	str8 labels[2] = {str8("Revert"), str8("Apply")};
 
-	i32 pressed_idx = -1;
-	for (u32 i = 0; i < ARRAY_COUNT(cs); i++) {
+	s32 pressed_idx = -1;
+	for (u32 i = 0; i < countof(cs); i++) {
 		if (CheckCollisionPointRec(ctx->mouse_pos.rv, cs[i].rr) && ctx->held_idx == -1) {
 			ctx->selection_hover_t[i] += TEXT_HOVER_SPEED * ctx->dt;
 
@@ -761,8 +761,8 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	}
 }
 
-static void
-do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f32 *colours)
+function void
+do_slider_shader(ColourPickerCtx *ctx, Rect r, s32 colour_mode, f32 *regions, f32 *colours)
 {
 	f32 border_thick = SLIDER_BORDER_WIDTH;
 	f32 radius       = SLIDER_ROUNDNESS / 2;
@@ -781,7 +781,7 @@ do_slider_shader(ColourPickerCtx *ctx, Rect r, i32 colour_mode, f32 *regions, f3
 	EndShaderMode();
 }
 
-static void
+function void
 do_slider_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 {
 	BEGIN_CYCLE_COUNT(CC_DO_SLIDER);
@@ -808,7 +808,7 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 	f32 r_bound = sr.pos.x + sr.size.w;
 	f32 y_step  = 1.525 * ss.size.h;
 
-	for (i32 i = 0; i < 4; i++) {
+	for (s32 i = 0; i < 4; i++) {
 		do_slider(ctx, ss, i, relative_mouse);
 		ss.pos.y += y_step;
 	}
@@ -834,8 +834,8 @@ do_slider_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 #define PM_MIDDLE 1
 #define PM_RIGHT  2
 
-static v4
-do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
+function v4
+do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, s32 idx,
                    v4 bot_colour, v4 top_colour, v4 colour)
 {
 	b32 hovering = CheckCollisionPointRec(test_pos.rv, r.rr);
@@ -873,7 +873,7 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, i32 idx,
 	return colour;
 }
 
-static void
+function void
 do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 {
 	BEGIN_CYCLE_COUNT(CC_DO_PICKER);
@@ -996,7 +996,7 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 #ifdef _DEBUG
 #include <stdio.h>
 #endif
-static void
+function void
 debug_dump_info(ColourPickerCtx *ctx)
 {
 	(void)ctx;
@@ -1006,7 +1006,7 @@ debug_dump_info(ColourPickerCtx *ctx)
 
 	DrawFPS(20, 20);
 
-	static char *fmts[CC_LAST] = {
+	local_persist char *fmts[CC_LAST] = {
 		[CC_WHOLE_RUN] = "Whole Run:   %7ld cyc | %2d h | %7d cyc/h\n",
 		[CC_DO_PICKER] = "Picker Mode: %7ld cyc | %2d h | %7d cyc/h\n",
 		[CC_DO_SLIDER] = "Slider Mode: %7ld cyc | %2d h | %7d cyc/h\n",
@@ -1015,8 +1015,8 @@ debug_dump_info(ColourPickerCtx *ctx)
 		[CC_TEMP]      = "Temp:        %7ld cyc | %2d h | %7d cyc/h\n",
 	};
 
-	i64 cycs[CC_LAST];
-	i64 hits[CC_LAST];
+	s64 cycs[CC_LAST];
+	s64 hits[CC_LAST];
 
 	for (u32 i = 0; i < CC_LAST; i++) {
 		cycs[i] = g_debug_clock_counts.total_cycles[i];
@@ -1028,7 +1028,7 @@ debug_dump_info(ColourPickerCtx *ctx)
 	if (!(ctx->flags & CPF_PRINT_DEBUG))
 		return;
 
-	static u32 fcount;
+	local_persist u32 fcount;
 	fcount++;
 	if (fcount != 60)
 		return;
@@ -1101,26 +1101,26 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 	ma_relative_mouse.y  -= ma.pos.y;
 
 	{
-		if (ctx->picker_texture.texture.width != (i32)(ma.size.w)) {
-			i32 w = ma.size.w;
-			i32 h = ma.size.h;
+		if (ctx->picker_texture.texture.width != (s32)(ma.size.w)) {
+			s32 w = ma.size.w;
+			s32 h = ma.size.h;
 			UnloadRenderTexture(ctx->picker_texture);
 			ctx->picker_texture = LoadRenderTexture(w, h);
 			if (ctx->mode != CPM_PICKER) {
-				i32 mode  = ctx->mode;
+				s32 mode  = ctx->mode;
 				ctx->mode = CPM_PICKER;
 				do_picker_mode(ctx, ma_relative_mouse);
 				ctx->mode = mode;
 			}
 		}
 
-		if (ctx->slider_texture.texture.width != (i32)(ma.size.w)) {
-			i32 w = ma.size.w;
-			i32 h = ma.size.h;
+		if (ctx->slider_texture.texture.width != (s32)(ma.size.w)) {
+			s32 w = ma.size.w;
+			s32 h = ma.size.h;
 			UnloadRenderTexture(ctx->slider_texture);
 			ctx->slider_texture = LoadRenderTexture(w, h);
 			if (ctx->mode != CPM_SLIDERS) {
-				i32 mode  = ctx->mode;
+				s32 mode  = ctx->mode;
 				ctx->mode = CPM_SLIDERS;
 				do_slider_mode(ctx, ma_relative_mouse);
 				ctx->mode = mode;
@@ -1232,17 +1232,17 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 
-		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, s8("Copy"), fg, bg)) {
+		if (do_text_button(ctx, ctx->buttons + 0, ctx->mouse_pos, btn_r, str8("Copy"), fg, bg)) {
 			/* NOTE: SetClipboardText needs a NUL terminated string */
 			u8 cbuf[9] = {0};
-			Stream cstream = {.data = cbuf, .cap = ARRAY_COUNT(cbuf) - 1};
+			Stream cstream = {.data = cbuf, .cap = countof(cbuf) - 1};
 			stream_append_colour(&cstream, bg);
 			SetClipboardText((char *)cbuf);
 		}
 		btn_r.pos.y += 0.54 * mb.size.h;
 
-		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, s8("Paste"), fg, bg)) {
-			s8 txt = cstr_to_s8((char *)GetClipboardText());
+		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, str8("Paste"), fg, bg)) {
+			str8 txt = str8_from_c_str((char *)GetClipboardText());
 			if (txt.len) {
 				v4 new_colour = normalize_colour(parse_hex_u32(txt));
 				store_formatted_colour(ctx, new_colour, CM_RGB);

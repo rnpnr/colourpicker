@@ -8,14 +8,16 @@
 
 #include "config.h"
 
+#define function static
+
 #define ISSPACE(a)  ((a) == ' ' || (a) == '\t')
 
-typedef struct {uint8_t *data; ptrdiff_t len;} s8;
+typedef struct {uint8_t *data; ptrdiff_t len;} str8;
 
-static s8
-read_whole_file(char *name, s8 *mem)
+function str8
+read_whole_file(char *name, str8 *mem)
 {
-	s8 res = {0};
+	str8 res = {0};
 	FILE *fp = fopen(name, "r");
 
 	if (!fp) {
@@ -41,10 +43,10 @@ read_whole_file(char *name, s8 *mem)
 	return res;
 }
 
-static s8
-get_line(s8 *s)
+function str8
+get_line(str8 *s)
 {
-	s8 res = {.data = s->data};
+	str8 res = {.data = s->data};
 	while (s->len && s->data[0] != '\n') {
 		s->data++;
 		s->len--;
@@ -57,10 +59,10 @@ get_line(s8 *s)
 }
 
 /* NOTE: modified from raylib */
-static void
-export_font_as_code(char *font_path, char *output_name, int font_size, s8 mem)
+function void
+export_font_as_code(char *font_path, char *output_name, int font_size, str8 mem)
 {
-	s8 raw            = read_whole_file(font_path, &mem);
+	str8 raw            = read_whole_file(font_path, &mem);
 	Font font         = {0};
 	font.baseSize     = font_size;
 	font.glyphCount   = 95;
@@ -144,13 +146,13 @@ int
 main(void)
 {
 	static uint8_t mem[2u * 1024u * 1024u];
-	s8 smem = {.data = mem, .len = sizeof(mem)};
+	str8 smem = {.data = mem, .len = sizeof(mem)};
 
 	SetTraceLogLevel(LOG_NONE);
 	int font_sizes[] = { FONT_SIZE, FONT_SIZE/2 };
-	for (int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
-		s8 tmem = smem;
-		s8 rmem = smem;
+	for (unsigned int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
+		str8 tmem = smem;
+		str8 rmem = smem;
 		size_t tlen  = snprintf((char *)tmem.data, tmem.len, "lora_sb_%d_inc.h", i);
 		rmem.len    -= (tlen + 1);
 		rmem.data   += (tlen + 1);
@@ -163,10 +165,10 @@ main(void)
 		return 1;
 	}
 
-	s8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME, &smem);
-	s8 s = shader_data;
+	str8 shader_data = read_whole_file(HSV_LERP_SHADER_NAME, &smem);
+	str8 s = shader_data;
 	/* NOTE: skip over license notice */
-	s8 line = get_line(&s);
+	str8 line = get_line(&s);
 	fputs("static char *g_hsv_shader_text =\n\t", out_file);
 	do {
 		line = get_line(&s);
