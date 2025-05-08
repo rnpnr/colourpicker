@@ -4,13 +4,44 @@
 
 #include "util.c"
 
+global f32 dt_for_frame;
+
 global str8 mode_labels[CM_LAST][4] = {
 	[CM_RGB] = { str8("R"), str8("G"), str8("B"), str8("A") },
 	[CM_HSV] = { str8("H"), str8("S"), str8("V"), str8("A") },
 };
 
+#ifdef _DEBUG
+enum clock_counts {
+	CC_WHOLE_RUN,
+	CC_DO_PICKER,
+	CC_DO_SLIDER,
+	CC_UPPER,
+	CC_LOWER,
+	CC_TEMP,
+	CC_LAST
+};
+global struct {
+	s64 cpu_cycles[CC_LAST];
+	s64 total_cycles[CC_LAST];
+	s64 hit_count[CC_LAST];
+} g_debug_clock_counts;
+
+#define BEGIN_CYCLE_COUNT(cc_name) \
+	g_debug_clock_counts.cpu_cycles[cc_name] = rdtsc(); \
+	g_debug_clock_counts.hit_count[cc_name]++
+
+#define END_CYCLE_COUNT(cc_name) \
+	g_debug_clock_counts.cpu_cycles[cc_name] = rdtsc() - g_debug_clock_counts.cpu_cycles[cc_name]; \
+	g_debug_clock_counts.total_cycles[cc_name] += g_debug_clock_counts.cpu_cycles[cc_name]
+
+#else
+#define BEGIN_CYCLE_COUNT(a)
+#define END_CYCLE_COUNT(a)
+#endif
+
 function void
-mem_move(u8 *src, u8 *dest, sz n)
+mem_move(u8 *dest, u8 *src, sz n)
 {
 	if (dest < src) while (n) { *dest++ = *src++; n--; }
 	else            while (n) { n--; dest[n] = src[n]; }
@@ -270,12 +301,12 @@ get_slider_subrects(Rect r, Rect *label, Rect *slider, Rect *value)
 function void
 parse_and_store_text_input(ColourPickerCtx *ctx)
 {
-	str8 input = {.len = ctx->is.buf_len, .data = ctx->is.buf};
+	str8 input = {.len = ctx->text_input_state.count, .data = ctx->text_input_state.buf};
 	v4   new_colour = {0};
 	enum colour_mode new_mode = CM_LAST;
-	if (ctx->is.idx == -1) {
+	if (ctx->text_input_state.idx == -1) {
 		return;
-	} else if (ctx->is.idx == INPUT_HEX) {
+	} else if (ctx->text_input_state.idx == INPUT_HEX) {
 		new_colour = normalize_colour(parse_hex_u32(input));
 		new_mode   = CM_RGB;
 	} else {
@@ -283,7 +314,7 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 		new_colour = ctx->colour;
 		f32 fv = parse_f64(input);
 		CLAMP01(fv);
-		switch(ctx->is.idx) {
+		switch(ctx->text_input_state.idx) {
 		case INPUT_R: new_colour.r = fv; break;
 		case INPUT_G: new_colour.g = fv; break;
 		case INPUT_B: new_colour.b = fv; break;
@@ -299,10 +330,10 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 function void
 set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mouse)
 {
-	if (ctx->is.idx != (s32)idx)
+	if (ctx->text_input_state.idx != (s32)idx)
 		parse_and_store_text_input(ctx);
 
-	Stream in = {.data = ctx->is.buf, .cap = countof(ctx->is.buf)};
+	Stream in = {.data = ctx->text_input_state.buf, .cap = countof(ctx->text_input_state.buf)};
 	if (idx == INPUT_HEX) {
 		stream_append_colour(&in, rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
 	} else {
@@ -316,28 +347,29 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 		}
 		stream_append_f64(&in, fv, 100);
 	}
-	ctx->is.buf_len = in.widx;
+	ctx->text_input_state.count = in.widx;
 
-	ctx->is.idx    = idx;
-	ctx->is.cursor = -1;
-	CLAMP(ctx->is.idx, -1, INPUT_A);
-	if (ctx->is.idx == -1)
+	ctx->text_input_state.idx    = idx;
+	ctx->text_input_state.cursor = -1;
+	CLAMP(ctx->text_input_state.idx, -1, INPUT_A);
+	if (ctx->text_input_state.idx == -1)
 		return;
 
 	ASSERT(CheckCollisionPointRec(mouse.rv, r.rr));
-	ctx->is.cursor_hover_p = (mouse.x - r.pos.x) / r.size.w;
-	CLAMP01(ctx->is.cursor_hover_p);
+	ctx->text_input_state.cursor_hover_p = (mouse.x - r.pos.x) / r.size.w;
+	CLAMP01(ctx->text_input_state.cursor_hover_p);
 }
 
 function void
 do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, s32 max_disp_chars)
 {
-	v2 ts  = measure_text(ctx->font, (str8){.len = ctx->is.buf_len, .data = ctx->is.buf});
+	TextInputState *is = &ctx->text_input_state;
+	v2 ts  = measure_text(ctx->font, (str8){.len = is->count, .data = is->buf});
 	v2 pos = {.x = r.pos.x, .y = r.pos.y + (r.size.y - ts.y) / 2};
 
-	s32 buf_delta = ctx->is.buf_len - max_disp_chars;
+	s32 buf_delta = is->count - max_disp_chars;
 	if (buf_delta < 0) buf_delta = 0;
-	str8 buf = {.len = ctx->is.buf_len - buf_delta, .data = ctx->is.buf + buf_delta};
+	str8 buf = {.len = is->count - buf_delta, .data = is->buf + buf_delta};
 	{
 		/* NOTE: drop a char if the subtext still doesn't fit */
 		v2 nts = measure_text(ctx->font, buf);
@@ -348,40 +380,38 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, s32 max_disp_chars)
 	}
 	draw_text(ctx->font, buf, pos, colour);
 
-	ctx->is.cursor_t = move_towards_f32(ctx->is.cursor_t, ctx->is.cursor_t_target,
-	                                    1.5 * ctx->dt);
-	if (ctx->is.cursor_t == ctx->is.cursor_t_target) {
-		if (ctx->is.cursor_t_target == 0) ctx->is.cursor_t_target = 1;
-		else                              ctx->is.cursor_t_target = 0;
+	is->cursor_t = move_towards_f32(is->cursor_t, is->cursor_t_target, 1.5 * dt_for_frame);
+	if (is->cursor_t == is->cursor_t_target) {
+		if (is->cursor_t_target == 0) is->cursor_t_target = 1;
+		else                          is->cursor_t_target = 0;
 	}
 
 	v4 bg = ctx->cursor_colour;
 	bg.a  = 0;
-	Color cursor_colour = rl_colour_from_normalized(lerp_v4(bg, ctx->cursor_colour,
-	                                                        ctx->is.cursor_t));
+	Color cursor_colour = rl_colour_from_normalized(lerp_v4(bg, ctx->cursor_colour, is->cursor_t));
 
 	/* NOTE: guess a cursor position */
-	if (ctx->is.cursor == -1) {
+	if (is->cursor == -1) {
 		/* NOTE: extra offset to help with putting a cursor at idx 0 */
 		#define TEXT_HALF_CHAR_WIDTH 10
-		f32 x_off = TEXT_HALF_CHAR_WIDTH, x_bounds = r.size.w * ctx->is.cursor_hover_p;
+		f32 x_off = TEXT_HALF_CHAR_WIDTH, x_bounds = r.size.w * is->cursor_hover_p;
 		s32 i;
-		for (i = 0; i < ctx->is.buf_len && x_off < x_bounds; i++) {
+		for (i = 0; i < is->count && x_off < x_bounds; i++) {
 			/* NOTE: assumes font glyphs are ordered */
-			s32 idx = ctx->is.buf[i] - 32;
+			s32 idx = is->buf[i] - 32;
 			x_off  += ctx->font.glyphs[idx].advanceX;
 			if (ctx->font.glyphs[idx].advanceX == 0)
 				x_off += ctx->font.recs[idx].width;
 		}
-		ctx->is.cursor = i;
+		is->cursor = i;
 	}
 
-	buf.len = ctx->is.cursor - buf_delta;
+	buf.len = is->cursor - buf_delta;
 	v2 sts = measure_text(ctx->font, buf);
 	f32 cursor_x = r.pos.x + sts.x;
 	f32 cursor_width;
-	if (ctx->is.cursor == ctx->is.buf_len) cursor_width = MIN(ctx->window_size.w * 0.03, 20);
-	else                                   cursor_width = MIN(ctx->window_size.w * 0.01, 6);
+	if (is->cursor == is->count) cursor_width = MIN(ctx->window_size.w * 0.03, 20);
+	else                         cursor_width = MIN(ctx->window_size.w * 0.01, 6);
 
 	Rect cursor_r = {
 		.pos  = {.x = cursor_x,     .y = pos.y},
@@ -391,69 +421,63 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, s32 max_disp_chars)
 	DrawRectangleRec(cursor_r.rr, cursor_colour);
 
 	/* NOTE: handle multiple input keys on a single frame */
-	s32 key = GetCharPressed();
-	while (key > 0) {
-		if (ctx->is.buf_len == countof(ctx->is.buf))
-			break;
+	for (s32 key = GetCharPressed();
+	     is->count < (s32)countof(is->buf) && key > 0;
+	     key = GetCharPressed())
+	{
+		mem_move(is->buf + is->cursor + 1,
+		         is->buf + is->cursor,
+		         is->count - is->cursor);
 
-		mem_move(ctx->is.buf + ctx->is.cursor,
-		         ctx->is.buf + ctx->is.cursor + 1,
-		         ctx->is.buf_len - ctx->is.cursor + 1);
-
-		ctx->is.buf[ctx->is.cursor++] = key;
-		ctx->is.buf_len++;
-		key = GetCharPressed();
+		is->buf[is->cursor++] = key;
+		is->count++;
 	}
 
-	if ((IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT)) && ctx->is.cursor > 0)
-		ctx->is.cursor--;
+	is->cursor -= (IsKeyPressed(KEY_LEFT)  || IsKeyPressedRepeat(KEY_LEFT))  && is->cursor > 0;
+	is->cursor += (IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT)) && is->cursor < is->count;
 
-	if ((IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT)) &&
-	    ctx->is.cursor < ctx->is.buf_len)
-		ctx->is.cursor++;
-
-	if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) &&
-	    ctx->is.cursor > 0) {
-		ctx->is.cursor--;
-		mem_move(ctx->is.buf + ctx->is.cursor + 1,
-		         ctx->is.buf + ctx->is.cursor,
-		         ctx->is.buf_len - ctx->is.cursor);
-		ctx->is.buf_len--;
+	if ((IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) && is->cursor > 0) {
+		is->cursor--;
+		if (is->cursor < countof(is->buf) - 1) {
+			mem_move(is->buf + is->cursor,
+			         is->buf + is->cursor + 1,
+			         is->count - is->cursor - 1);
+		}
+		is->count--;
 	}
 
-	if ((IsKeyPressed(KEY_DELETE) || IsKeyPressedRepeat(KEY_DELETE)) &&
-	    ctx->is.cursor < ctx->is.buf_len) {
-		mem_move(ctx->is.buf + ctx->is.cursor + 1,
-		         ctx->is.buf + ctx->is.cursor,
-		         ctx->is.buf_len - ctx->is.cursor);
-		ctx->is.buf_len--;
+	if ((IsKeyPressed(KEY_DELETE) || IsKeyPressedRepeat(KEY_DELETE)) && is->cursor < is->count) {
+		mem_move(is->buf + is->cursor,
+		         is->buf + is->cursor + 1,
+		         is->count - is->cursor - 1);
+		is->count--;
 	}
 
 	if (IsKeyPressed(KEY_ENTER)) {
 		parse_and_store_text_input(ctx);
-		ctx->is.idx = -1;
+		is->idx = -1;
 	}
 }
 
 function s32
-do_button(ButtonState *btn, v2 mouse, Rect r, f32 dt, f32 hover_speed)
+do_button(ButtonState *btn, v2 mouse, Rect r, f32 hover_speed)
 {
 	b32 hovered       = CheckCollisionPointRec(mouse.rv, r.rr);
 	s32 pressed_mask  = 0;
 	pressed_mask     |= MOUSE_LEFT  * (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
 	pressed_mask     |= MOUSE_RIGHT * (hovered && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT));
 
-	if (hovered) btn->hover_t += hover_speed * dt;
-	else         btn->hover_t -= hover_speed * dt;
+	if (hovered) btn->hover_t += hover_speed * dt_for_frame;
+	else         btn->hover_t -= hover_speed * dt_for_frame;
 	CLAMP01(btn->hover_t);
 
 	return pressed_mask;
 }
 
 function s32
-do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_speed, f32 scale_target, f32 fade_t)
+do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 hover_speed, f32 scale_target, f32 fade_t)
 {
-	s32 pressed_mask = do_button(btn, mouse, r, dt, hover_speed);
+	s32 pressed_mask = do_button(btn, mouse, r, hover_speed);
 
 	f32 param  = lerp(1, scale_target, btn->hover_t);
 	v2  bscale = (v2){
@@ -471,7 +495,7 @@ do_rect_button(ButtonState *btn, v2 mouse, Rect r, Color bg, f32 dt, f32 hover_s
 function s32
 do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, str8 text, v4 fg, Color bg)
 {
-	s32 pressed_mask = do_rect_button(btn, mouse, r, bg, ctx->dt, TEXT_HOVER_SPEED, 1, 1);
+	s32 pressed_mask = do_rect_button(btn, mouse, r, bg, TEXT_HOVER_SPEED, 1, 1);
 
 	v2 tpos   = center_align_text_in_rect(r, text, ctx->font);
 	v2 spos   = {.x = tpos.x + 1.75, .y = tpos.y + 2};
@@ -511,7 +535,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, s32 label_idx, v2 relative_mouse)
 	f32 current = ctx->colour.E[label_idx];
 
 	{
-		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0) * SLIDER_SCALE_SPEED * ctx->dt;
+		f32 scale_delta  = (SLIDER_SCALE_TARGET - 1.0) * SLIDER_SCALE_SPEED * dt_for_frame;
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && label_idx == ctx->held_idx);
 		f32 scale = ctx->ss.scale_t[label_idx];
@@ -529,14 +553,14 @@ do_slider(ColourPickerCtx *ctx, Rect r, s32 label_idx, v2 relative_mouse)
 	{
 		SliderState *s = &ctx->ss;
 		b32 collides = CheckCollisionPointRec(relative_mouse.rv, vr.rr);
-		if (collides && ctx->is.idx != (label_idx + 1)) {
-			s->colour_t[label_idx] += TEXT_HOVER_SPEED * ctx->dt;
+		if (collides && ctx->text_input_state.idx != (label_idx + 1)) {
+			s->colour_t[label_idx] += TEXT_HOVER_SPEED * dt_for_frame;
 		} else {
-			s->colour_t[label_idx] -= TEXT_HOVER_SPEED * ctx->dt;
+			s->colour_t[label_idx] -= TEXT_HOVER_SPEED * dt_for_frame;
 		}
 		CLAMP01(s->colour_t[label_idx]);
 
-		if (!collides && ctx->is.idx == (label_idx + 1) &&
+		if (!collides && ctx->text_input_state.idx == (label_idx + 1) &&
 		    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 			set_text_input_idx(ctx, -1, vr, relative_mouse);
 			current = ctx->colour.E[label_idx];
@@ -549,7 +573,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, s32 label_idx, v2 relative_mouse)
 		if (collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 			set_text_input_idx(ctx, label_idx + 1, vr, relative_mouse);
 
-		if (ctx->is.idx != (label_idx + 1)) {
+		if (ctx->text_input_state.idx != (label_idx + 1)) {
 			u8 vbuf[4];
 			Stream vstream = {.data = vbuf, .cap = countof(vbuf)};
 			stream_append_f64(&vstream, current, 100);
@@ -582,7 +606,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	mode_r.pos.y  += (mode_r.size.h - mode_ts.h) / 2;
 	mode_r.size.w  = mode_ts.w;
 
-	s32 mouse_mask = do_button(&ctx->sbs.mode, relative_mouse, mode_r, ctx->dt, TEXT_HOVER_SPEED);
+	s32 mouse_mask = do_button(&ctx->sbs.mode, relative_mouse, mode_r, TEXT_HOVER_SPEED);
 	if (mouse_mask & MOUSE_LEFT)  step_colour_mode(ctx, 1);
 	if (mouse_mask & MOUSE_RIGHT) step_colour_mode(ctx, -1);
 
@@ -603,7 +627,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 
 	s32 hex_collides = CheckCollisionPointRec(relative_mouse.rv, hex_r.rr);
 
-	if (!hex_collides && ctx->is.idx == INPUT_HEX &&
+	if (!hex_collides && ctx->text_input_state.idx == INPUT_HEX &&
 	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		set_text_input_idx(ctx, -1, hex_r, relative_mouse);
 		hstream.widx = 0;
@@ -614,10 +638,10 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	if (hex_collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 		set_text_input_idx(ctx, INPUT_HEX, hex_r, relative_mouse);
 
-	if (hex_collides && ctx->is.idx != INPUT_HEX)
-		ctx->sbs.hex_hover_t += TEXT_HOVER_SPEED * ctx->dt;
+	if (hex_collides && ctx->text_input_state.idx != INPUT_HEX)
+		ctx->sbs.hex_hover_t += TEXT_HOVER_SPEED * dt_for_frame;
 	else
-		ctx->sbs.hex_hover_t -= TEXT_HOVER_SPEED * ctx->dt;
+		ctx->sbs.hex_hover_t -= TEXT_HOVER_SPEED * dt_for_frame;
 	CLAMP01(ctx->sbs.hex_hover_t);
 
 	v4 fg          = normalize_colour(pack_rl_colour(ctx->fg));
@@ -627,7 +651,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	draw_text(ctx->font, label, left_align_text_in_rect(label_r, label, ctx->font), ctx->fg);
 
 	Color hex_colour_rl = rl_colour_from_normalized(hex_colour);
-	if (ctx->is.idx != INPUT_HEX) {
+	if (ctx->text_input_state.idx != INPUT_HEX) {
 		draw_text(ctx->font, hex, left_align_text_in_rect(hex_r, hex, ctx->font), hex_colour_rl);
 	} else {
 		do_text_input(ctx, hex_r, hex_colour_rl, 8);
@@ -656,7 +680,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	/* NOTE: Stack is moving up; draw last top item as it moves up and fades out */
 	if (css->fade_param) {
 		ButtonState btn;
-		do_rect_button(&btn, ctx->mouse_pos, r, rl_colour_from_normalized(css->last), ctx->dt,
+		do_rect_button(&btn, ctx->mouse_pos, r, rl_colour_from_normalized(css->last),
 		               0, 1, css->fade_param);
 		r.pos.y += y_pos_delta;
 	}
@@ -667,7 +691,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	for (u32 i = 0; i < countof(css->items); i++) {
 		s32 cidx    = (css->widx + i) % countof(css->items);
 		Color bg    = rl_colour_from_normalized(css->items[cidx]);
-		b32 pressed = do_rect_button(css->buttons + cidx, ctx->mouse_pos, r, bg, ctx->dt,
+		b32 pressed = do_rect_button(css->buttons + cidx, ctx->mouse_pos, r, bg,
 		                             BUTTON_HOVER_SPEED, stack_scale_target,
 		                             1 - css->fade_param * fade_scale[i]);
 		if (pressed) {
@@ -681,8 +705,8 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 		r.pos.y += y_pos_delta;
 	}
 
-	css->fade_param -= BUTTON_HOVER_SPEED * ctx->dt;
-	css->y_off_t    += BUTTON_HOVER_SPEED * ctx->dt;
+	css->fade_param -= BUTTON_HOVER_SPEED * dt_for_frame;
+	css->y_off_t    += BUTTON_HOVER_SPEED * dt_for_frame;
 	if (css->fade_param < 0) {
 		css->fade_param = 0;
 		css->y_off_t    = 0;
@@ -692,7 +716,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	r.pos.x  += r.size.w * 0.1;
 	r.size.w *= 0.8;
 
-	b32 push_pressed = do_button(&css->tri_btn, ctx->mouse_pos, r, ctx->dt, BUTTON_HOVER_SPEED);
+	b32 push_pressed = do_button(&css->tri_btn, ctx->mouse_pos, r, BUTTON_HOVER_SPEED);
 	f32 param    = css->tri_btn.hover_t;
 	v2 tri_size  = {.x = 0.25 * r.size.w,          .y = 0.5 * r.size.h};
 	v2 tri_scale = {.x = 1 - 0.5 * param,          .y = 1 + 0.3 * param};
@@ -724,12 +748,12 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 	s32 pressed_idx = -1;
 	for (u32 i = 0; i < countof(cs); i++) {
 		if (CheckCollisionPointRec(ctx->mouse_pos.rv, cs[i].rr) && ctx->held_idx == -1) {
-			ctx->selection_hover_t[i] += TEXT_HOVER_SPEED * ctx->dt;
+			ctx->selection_hover_t[i] += TEXT_HOVER_SPEED * dt_for_frame;
 
 			if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 				pressed_idx = i;
 		} else {
-			ctx->selection_hover_t[i] -= TEXT_HOVER_SPEED * ctx->dt;
+			ctx->selection_hover_t[i] -= TEXT_HOVER_SPEED * dt_for_frame;
 		}
 
 		CLAMP01(ctx->selection_hover_t[i]);
@@ -858,8 +882,8 @@ do_vertical_slider(ColourPickerCtx *ctx, v2 test_pos, Rect r, s32 idx,
 	{
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && ctx->held_idx == idx);
-		if (should_scale) ctx->pms.scale_t[idx] += SLIDER_SCALE_SPEED * ctx->dt;
-		else              ctx->pms.scale_t[idx] -= SLIDER_SCALE_SPEED * ctx->dt;
+		if (should_scale) ctx->pms.scale_t[idx] += SLIDER_SCALE_SPEED * dt_for_frame;
+		else              ctx->pms.scale_t[idx] -= SLIDER_SCALE_SPEED * dt_for_frame;
 		CLAMP01(ctx->pms.scale_t[idx]);
 
 		f32 scale    = lerp(1, SLIDER_SCALE_TARGET, ctx->pms.scale_t[idx]);
@@ -943,8 +967,8 @@ do_picker_mode(ColourPickerCtx *ctx, v2 relative_mouse)
 	{
 		b32 should_scale = (ctx->held_idx == -1 && hovering) ||
 		                   (ctx->held_idx != -1 && ctx->held_idx == PM_RIGHT);
-		if (should_scale) ctx->pms.scale_t[PM_RIGHT] += SLIDER_SCALE_SPEED * ctx->dt;
-		else              ctx->pms.scale_t[PM_RIGHT] -= SLIDER_SCALE_SPEED * ctx->dt;
+		if (should_scale) ctx->pms.scale_t[PM_RIGHT] += SLIDER_SCALE_SPEED * dt_for_frame;
+		else              ctx->pms.scale_t[PM_RIGHT] -= SLIDER_SCALE_SPEED * dt_for_frame;
 		CLAMP01(ctx->pms.scale_t[PM_RIGHT]);
 
 		f32 slider_scale = lerp(1, SLIDER_SCALE_TARGET, ctx->pms.scale_t[PM_RIGHT]);
@@ -1048,6 +1072,8 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 {
 	BEGIN_CYCLE_COUNT(CC_WHOLE_RUN);
 
+	dt_for_frame = dt;
+
 	if (IsWindowResized()) {
 		ctx->window_size.h = GetScreenHeight();
 		ctx->window_size.w = ctx->window_size.h / WINDOW_ASPECT_RATIO;
@@ -1072,7 +1098,6 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		ctx->border_thick_id = GetShaderLocation(ctx->picker_shader, "u_border_thick");
 	}
 
-	ctx->dt            = dt;
 	ctx->mouse_pos.rv  = mouse_pos;
 	ctx->window_pos.rv = window_pos;
 
@@ -1184,13 +1209,13 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 
 		NPatchInfo tnp = {tr.rr, 0, 0, 0, 0, NPATCH_NINE_PATCH };
 		for (u32 i = 0; i < CPM_LAST; i++) {
-			if (do_button(ctx->mcs.buttons + i, ctx->mouse_pos, mb, ctx->dt, 10)) {
+			if (do_button(ctx->mcs.buttons + i, ctx->mouse_pos, mb, 10)) {
 				if (ctx->mode != i)
 					ctx->mcs.next_mode = i;
 			}
 
 			if (ctx->mcs.next_mode != -1) {
-				ctx->mcs.mode_visible_t -= 2 * ctx->dt;
+				ctx->mcs.mode_visible_t -= 2 * dt_for_frame;
 				if (ctx->mcs.mode_visible_t < 0) {
 					ctx->mode          = ctx->mcs.next_mode;
 					ctx->mcs.next_mode = -1;
@@ -1202,7 +1227,7 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 					ctx->flags |= CPF_REFILL_TEXTURE;
 				}
 			} else {
-				ctx->mcs.mode_visible_t += 2 * ctx->dt;
+				ctx->mcs.mode_visible_t += 2 * dt_for_frame;
 			}
 			CLAMP01(ctx->mcs.mode_visible_t);
 

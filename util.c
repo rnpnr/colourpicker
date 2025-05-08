@@ -187,44 +187,14 @@ typedef struct {
 } PickerModeState;
 
 typedef struct {
-	s32  idx;
+	s32  idx; /* TODO(rnp): remove */
+	s32  count;
 	s32  cursor;
-	f32  cursor_hover_p;
+	f32  cursor_hover_p; /* TODO(rnp): remove */
 	f32  cursor_t;
-	f32  cursor_t_target;
-	s32  buf_len;
+	f32  cursor_t_target; /* TODO(rnp): remove */
 	u8   buf[64];
-} InputState;
-
-#ifdef _DEBUG
-enum clock_counts {
-	CC_WHOLE_RUN,
-	CC_DO_PICKER,
-	CC_DO_SLIDER,
-	CC_UPPER,
-	CC_LOWER,
-	CC_TEMP,
-	CC_LAST
-};
-
-global struct {
-	s64 cpu_cycles[CC_LAST];
-	s64 total_cycles[CC_LAST];
-	s64 hit_count[CC_LAST];
-} g_debug_clock_counts;
-
-#define BEGIN_CYCLE_COUNT(cc_name) \
-	g_debug_clock_counts.cpu_cycles[cc_name] = rdtsc(); \
-	g_debug_clock_counts.hit_count[cc_name]++
-
-#define END_CYCLE_COUNT(cc_name) \
-	g_debug_clock_counts.cpu_cycles[cc_name] = rdtsc() - g_debug_clock_counts.cpu_cycles[cc_name]; \
-	g_debug_clock_counts.total_cycles[cc_name] += g_debug_clock_counts.cpu_cycles[cc_name]
-
-#else
-#define BEGIN_CYCLE_COUNT(a)
-#define END_CYCLE_COUNT(a)
-#endif
+} TextInputState;
 
 typedef struct {
 	v4 colour, previous_colour;
@@ -234,12 +204,10 @@ typedef struct {
 	v2  window_pos;
 	v2  mouse_pos;
 
-	f32 dt;
-
 	Font  font;
 	Color bg, fg;
 
-	InputState      is;
+	TextInputState  text_input_state;
 	ModeChangeState mcs;
 	PickerModeState pms;
 	SliderState     ss;
@@ -264,7 +232,7 @@ typedef struct {
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
-#define countof(a) (sizeof(a) / sizeof(*a))
+#define countof(a) (s64)(sizeof(a) / sizeof(*a))
 
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define MIN(a, b)      ((a) < (b) ? (a) : (b))

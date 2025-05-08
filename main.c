@@ -86,8 +86,7 @@ main(s32 argc, char *argv[])
 		.colour_mode = CM_HSV,
 		.flags       = CPF_REFILL_TEXTURE,
 
-
-		.is  = {.idx = -1, .cursor_t = 1, .cursor_t_target = 0},
+		.text_input_state = {.idx = -1, .cursor_t = 1, .cursor_t_target = 0},
 		.mcs = {.mode_visible_t = 1, .next_mode = -1},
 		.ss  = {.scale_t = {1, 1, 1, 1}},
 
