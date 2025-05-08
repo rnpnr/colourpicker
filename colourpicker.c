@@ -304,7 +304,7 @@ set_text_input_idx(ColourPickerCtx *ctx, enum input_indices idx, Rect r, v2 mous
 
 	Stream in = {.data = ctx->is.buf, .cap = ARRAY_COUNT(ctx->is.buf)};
 	if (idx == INPUT_HEX) {
-		stream_append_colour(&in, colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
+		stream_append_colour(&in, rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
 	} else {
 		f32 fv = 0;
 		switch (idx) {
@@ -357,8 +357,8 @@ do_text_input(ColourPickerCtx *ctx, Rect r, Color colour, i32 max_disp_chars)
 
 	v4 bg = ctx->cursor_colour;
 	bg.a  = 0;
-	Color cursor_colour = colour_from_normalized(lerp_v4(bg, ctx->cursor_colour,
-	                                                     ctx->is.cursor_t));
+	Color cursor_colour = rl_colour_from_normalized(lerp_v4(bg, ctx->cursor_colour,
+	                                                        ctx->is.cursor_t));
 
 	/* NOTE: guess a cursor position */
 	if (ctx->is.cursor == -1) {
@@ -478,7 +478,7 @@ do_text_button(ColourPickerCtx *ctx, ButtonState *btn, v2 mouse, Rect r, s8 text
 	v4 colour = lerp_v4(fg, ctx->hover_colour, btn->hover_t);
 
 	draw_text(ctx->font, text, spos, fade(BLACK, 0.8));
-	draw_text(ctx->font, text, tpos, colour_from_normalized(colour));
+	draw_text(ctx->font, text, tpos, rl_colour_from_normalized(colour));
 
 	return pressed_mask;
 }
@@ -544,7 +544,7 @@ do_slider(ColourPickerCtx *ctx, Rect r, i32 label_idx, v2 relative_mouse)
 
 		v4 colour       = lerp_v4(normalize_colour(pack_rl_colour(ctx->fg)),
 		                          ctx->hover_colour, s->colour_t[label_idx]);
-		Color colour_rl = colour_from_normalized(colour);
+		Color colour_rl = rl_colour_from_normalized(colour);
 
 		if (collides && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
 			set_text_input_idx(ctx, label_idx + 1, vr, relative_mouse);
@@ -588,7 +588,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 
 	u8 hbuf[8];
 	Stream hstream = {.data = hbuf, .cap = ARRAY_COUNT(hbuf)};
-	stream_append_colour(&hstream, colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
+	stream_append_colour(&hstream, rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
 	s8 hex   = {.len = hstream.widx, .data = hbuf};
 	s8 label = s8("RGB: ");
 
@@ -607,7 +607,7 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 	    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 		set_text_input_idx(ctx, -1, hex_r, relative_mouse);
 		hstream.widx = 0;
-		stream_append_colour(&hstream, colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
+		stream_append_colour(&hstream, rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB)));
 		hex.len = hstream.widx;
 	}
 
@@ -626,14 +626,14 @@ do_status_bar(ColourPickerCtx *ctx, Rect r, v2 relative_mouse)
 
 	draw_text(ctx->font, label, left_align_text_in_rect(label_r, label, ctx->font), ctx->fg);
 
-	Color hex_colour_rl = colour_from_normalized(hex_colour);
+	Color hex_colour_rl = rl_colour_from_normalized(hex_colour);
 	if (ctx->is.idx != INPUT_HEX) {
 		draw_text(ctx->font, hex, left_align_text_in_rect(hex_r, hex, ctx->font), hex_colour_rl);
 	} else {
 		do_text_input(ctx, hex_r, hex_colour_rl, 8);
 	}
 
-	draw_text(ctx->font, mode_txt, mode_r.pos, colour_from_normalized(mode_colour));
+	draw_text(ctx->font, mode_txt, mode_r.pos, rl_colour_from_normalized(mode_colour));
 }
 
 static void
@@ -656,7 +656,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	/* NOTE: Stack is moving up; draw last top item as it moves up and fades out */
 	if (css->fade_param) {
 		ButtonState btn;
-		do_rect_button(&btn, ctx->mouse_pos, r, colour_from_normalized(css->last), ctx->dt,
+		do_rect_button(&btn, ctx->mouse_pos, r, rl_colour_from_normalized(css->last), ctx->dt,
 		               0, 1, css->fade_param);
 		r.pos.y += y_pos_delta;
 	}
@@ -666,7 +666,7 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 	f32 fade_scale[ARRAY_COUNT(css->items)] = { [ARRAY_COUNT(css->items) - 1] = 1 };
 	for (u32 i = 0; i < ARRAY_COUNT(css->items); i++) {
 		i32 cidx    = (css->widx + i) % ARRAY_COUNT(css->items);
-		Color bg    = colour_from_normalized(css->items[cidx]);
+		Color bg    = rl_colour_from_normalized(css->items[cidx]);
 		b32 pressed = do_rect_button(css->buttons + cidx, ctx->mouse_pos, r, bg, ctx->dt,
 		                             BUTTON_HOVER_SPEED, stack_scale_target,
 		                             1 - css->fade_param * fade_scale[i]);
@@ -711,8 +711,8 @@ do_colour_stack(ColourPickerCtx *ctx, Rect sa)
 static void
 do_colour_selector(ColourPickerCtx *ctx, Rect r)
 {
-	Color colour  = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
-	Color pcolour = colour_from_normalized(ctx->previous_colour);
+	Color colour  = rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+	Color pcolour = rl_colour_from_normalized(ctx->previous_colour);
 
 	Rect cs[2] = {cut_rect_left(r, 0.5), cut_rect_right(r, 0.5)};
 	DrawRectangleRec(cs[0].rr, pcolour);
@@ -741,7 +741,7 @@ do_colour_selector(ColourPickerCtx *ctx, Rect r)
 		pos.x  += 1.75;
 		pos.y  += 2;
 		draw_text(ctx->font, labels[i], pos,  fade(BLACK, 0.8));
-		draw_text(ctx->font, labels[i], fpos, colour_from_normalized(colour));
+		draw_text(ctx->font, labels[i], fpos, rl_colour_from_normalized(colour));
 	}
 
 	DrawRectangleRoundedLinesEx(r.rr, SELECTOR_ROUNDNESS, 0, 4 * SELECTOR_BORDER_WIDTH, ctx->bg);
@@ -1228,7 +1228,7 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		}
 
 		v4 fg         = normalize_colour(pack_rl_colour(ctx->fg));
-		Color bg      = colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
+		Color bg      = rl_colour_from_normalized(get_formatted_colour(ctx, CM_RGB));
 		Rect btn_r    = mb;
 		btn_r.size.h *= 0.46;
 

@@ -1,28 +1,8 @@
 /* See LICENSE for copyright details */
 #ifndef _UTIL_C_
 #define _UTIL_C_
-#include <emmintrin.h>
-#include <immintrin.h>
-
 #include <stddef.h>
 #include <stdint.h>
-
-#include "shader_inc.h"
-#include "lora_sb_0_inc.h"
-#include "lora_sb_1_inc.h"
-#include "config.h"
-
-#ifndef asm
-#define asm __asm__
-#endif
-
-#ifdef _DEBUG
-#define ASSERT(c) do { if (!(c)) asm("int3; nop"); } while (0);
-#define DEBUG_EXPORT
-#else
-#define ASSERT(c)
-#define DEBUG_EXPORT static
-#endif
 
 typedef uint8_t   u8;
 typedef int32_t   i32;
@@ -33,6 +13,49 @@ typedef uint64_t  u64;
 typedef float     f32;
 typedef double    f64;
 typedef ptrdiff_t size;
+
+#define function      static
+#define global        static
+#define local_persist static
+
+#include "shader_inc.h"
+#include "lora_sb_0_inc.h"
+#include "lora_sb_1_inc.h"
+#include "config.h"
+
+#ifndef asm
+#define asm __asm__
+#endif
+
+#define FORCE_INLINE inline __attribute__((always_inline))
+
+#define fmod_f32(a, b) __builtin_fmodf((a), (b))
+
+#ifdef __ARM_ARCH_ISA_A64
+#define debugbreak() asm volatile ("brk 0xf000")
+
+function FORCE_INLINE u64
+rdtsc(void)
+{
+	register u64 cntvct asm("x0");
+	asm volatile ("mrs x0, cntvct_el0" : "=x"(cntvct));
+	return cntvct;
+}
+
+#elif __x86_64__
+#include <immintrin.h>
+#define debugbreak() asm volatile ("int3; nop")
+
+#define rdtsc() __rdtsc()
+#endif
+
+#ifdef _DEBUG
+#define ASSERT(c) do { if (!(c)) debugbreak(); } while (0);
+#define DEBUG_EXPORT
+#else
+#define ASSERT(c)
+#define DEBUG_EXPORT static
+#endif
 
 typedef struct { size len; u8 *data; } s8;
 #define s8(s) (s8){.len = sizeof(s) - 1, .data = (u8 *)s}
@@ -187,11 +210,11 @@ static struct {
 } g_debug_clock_counts;
 
 #define BEGIN_CYCLE_COUNT(cc_name) \
-	g_debug_clock_counts.cpu_cycles[cc_name] = __rdtsc(); \
+	g_debug_clock_counts.cpu_cycles[cc_name] = rdtsc(); \
 	g_debug_clock_counts.hit_count[cc_name]++
 
 #define END_CYCLE_COUNT(cc_name) \
-	g_debug_clock_counts.cpu_cycles[cc_name] = __rdtsc() - g_debug_clock_counts.cpu_cycles[cc_name]; \
+	g_debug_clock_counts.cpu_cycles[cc_name] = rdtsc() - g_debug_clock_counts.cpu_cycles[cc_name]; \
 	g_debug_clock_counts.total_cycles[cc_name] += g_debug_clock_counts.cpu_cycles[cc_name]
 
 #else
@@ -240,110 +263,72 @@ typedef struct {
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(*a))
 #define ABS(x)         ((x) < 0 ? (-x) : (x))
 #define MIN(a, b)      ((a) < (b) ? (a) : (b))
+#define MAX(a, b)      ((a) < (b) ? (b) : (a))
 #define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 #define CLAMP01(a)     CLAMP(a, 0, 1)
 
 #define ISDIGIT(a)     ((a) >= '0' && (a) <= '9')
 #define ISHEX(a)       (ISDIGIT(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
 
-static Color
-colour_from_normalized(v4 colour)
+function Color
+rl_colour_from_normalized(v4 colour)
 {
-	__m128 colour_v = _mm_loadu_ps(colour.E);
-	__m128 scale    = _mm_set1_ps(255.0f);
-	__m128i result  = _mm_cvtps_epi32(_mm_mul_ps(colour_v, scale));
-	_Alignas(16) u32 outu[4];
-	_mm_store_si128((__m128i *)outu, result);
-	return (Color){.r = outu[0] & 0xFF, .g = outu[1] & 0xFF, .b = outu[2] & 0xFF, .a = outu[3] & 0xFF };
+	Color result;
+	result.r = colour.r * 255;
+	result.g = colour.g * 255;
+	result.b = colour.b * 255;
+	result.a = colour.a * 255;
+	return result;
 }
 
-static v4
+function v4
 rgb_to_hsv(v4 rgb)
 {
-	__m128 rgba = _mm_loadu_ps(rgb.E);
-	__m128 gbra = _mm_shuffle_ps(rgba, rgba, _MM_SHUFFLE(3, 0, 2, 1));
-	__m128 brga = _mm_shuffle_ps(gbra, gbra, _MM_SHUFFLE(3, 0, 2, 1));
-
-	__m128 Max  = _mm_max_ps(rgba, _mm_max_ps(gbra, brga));
-	__m128 Min  = _mm_min_ps(rgba, _mm_min_ps(gbra, brga));
-	__m128 C    = _mm_sub_ps(Max, Min);
-
-	__m128 zero = _mm_set1_ps(0);
-	__m128 six  = _mm_set1_ps(6);
-
-	_Alignas(16) f32 aval[4]  = {0, 2, 4, 0};
-	_Alignas(16) f32 scale[4] = {1.0/6.0f, 0, 0, 0};
-	/* NOTE if C == 0 then take H as 0/1 (which are equivalent in HSV) */
-	__m128 t    = _mm_div_ps(_mm_sub_ps(gbra, brga), C);
-	t           = _mm_and_ps(t, _mm_cmpneq_ps(zero, C));
-	t           = _mm_add_ps(t, _mm_load_ps(aval));
-	/* TODO: does (G - B) / C ever exceed 6.0? */
-	/* NOTE: Compute fmodf on element [0] */
-	t           = _mm_sub_ps(t, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(t, _mm_load_ps(scale))), six));
-
-	__m128 H = _mm_div_ps(_mm_and_ps(t, _mm_cmpeq_ps(rgba, Max)), six);
-	__m128 S = _mm_div_ps(C, Max);
-
-	/* NOTE: Make sure H & S are 0 instead of NaN when V == 0 */
-	H = _mm_and_ps(H, _mm_cmpneq_ps(zero, Max));
-	S = _mm_and_ps(S, _mm_cmpneq_ps(zero, Max));
-
-	__m128 H0 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 0, 0, 0));
-	__m128 H1 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 1, 1, 1));
-	__m128 H2 = _mm_shuffle_ps(H, H, _MM_SHUFFLE(3, 2, 2, 2));
-	H         = _mm_or_ps(H0, _mm_or_ps(H1, H2));
-
-	/* NOTE: keep only element [0] from H vector; Max contains V & A */
-	__m128 hva  = _mm_blend_ps(Max, H, 0x01);
-	__m128 hsva = _mm_blend_ps(hva, S, 0x02);
-	hsva        = _mm_min_ps(hsva, _mm_set1_ps(1));
-
-	v4 res;
-	_mm_storeu_ps(res.E, hsva);
-	return res;
+	v4 hsv = {0};
+	f32 M = MAX(rgb.r, MAX(rgb.g, rgb.b));
+	f32 m = MIN(rgb.r, MIN(rgb.g, rgb.b));
+	if (M - m > 0) {
+		f32 C = M - m;
+		if (M == rgb.r) {
+			hsv.x = fmod_f32((rgb.g - rgb.b) / C, 6) / 6.0;
+		} else if (M == rgb.g) {
+			hsv.x = ((rgb.b - rgb.r) / C + 2) / 6.0;
+		} else {
+			hsv.x = ((rgb.r - rgb.g) / C + 4) / 6.0;
+		}
+		hsv.y = M? C / M : 0;
+		hsv.z = M;
+		hsv.a = rgb.a;
+	}
+	return hsv;
 }
 
-static v4
+function v4
 hsv_to_rgb(v4 hsv)
 {
-	/* f(k(n))   = V - V*S*max(0, min(k, min(4 - k, 1)))
-	 * k(n)      = fmod((n + H * 6), 6)
-	 * (R, G, B) = (f(n = 5), f(n = 3), f(n = 1))
-	 */
-	_Alignas(16) f32 nval[4] = {5.0f, 3.0f, 1.0f, 0.0f};
-	__m128 n   = _mm_load_ps(nval);
-	__m128 H   = _mm_set1_ps(hsv.x);
-	__m128 S   = _mm_set1_ps(hsv.y);
-	__m128 V   = _mm_set1_ps(hsv.z);
-	__m128 six = _mm_set1_ps(6);
-
-	__m128 t   = _mm_add_ps(n, _mm_mul_ps(six, H));
-	__m128 rem = _mm_floor_ps(_mm_div_ps(t, six));
-	__m128 k   = _mm_sub_ps(t, _mm_mul_ps(rem, six));
-
-	t = _mm_min_ps(_mm_sub_ps(_mm_set1_ps(4), k), _mm_set1_ps(1));
-	t = _mm_max_ps(_mm_set1_ps(0), _mm_min_ps(k, t));
-	t = _mm_mul_ps(t, _mm_mul_ps(S, V));
-
 	v4 rgba;
-	_mm_storeu_ps(rgba.E, _mm_sub_ps(V, t));
+	f32 k  = fmod_f32(5 + hsv.x * 6, 6);
+	rgba.r = hsv.z - hsv.z * hsv.y * MAX(0, MIN(1, MIN(k, 4 - k)));
+	k      = fmod_f32(3 + hsv.x * 6, 6);
+	rgba.g = hsv.z - hsv.z * hsv.y * MAX(0, MIN(1, MIN(k, 4 - k)));
+	k      = fmod_f32(1 + hsv.x * 6, 6);
+	rgba.b = hsv.z - hsv.z * hsv.y * MAX(0, MIN(1, MIN(k, 4 - k)));
 	rgba.a = hsv.a;
-
 	return rgba;
 }
 
-static v4
+function v4
 normalize_colour(u32 rgba)
 {
-	return (v4){
-		.r = ((rgba >> 24) & 0xFF) / 255.0f,
-		.g = ((rgba >> 16) & 0xFF) / 255.0f,
-		.b = ((rgba >>  8) & 0xFF) / 255.0f,
-		.a = ((rgba >>  0) & 0xFF) / 255.0f,
-	};
+	v4 result;
+	result.r = ((rgba >> 24) & 0xFF) / 255.0f;
+	result.g = ((rgba >> 16) & 0xFF) / 255.0f;
+	result.b = ((rgba >>  8) & 0xFF) / 255.0f;
+	result.a = ((rgba >>  0) & 0xFF) / 255.0f;
+	return result;
 }
 
-static u32
+function u32
 pack_rl_colour(Color colour)
 {
 	return colour.r << 24 | colour.g << 16 | colour.b << 8 | colour.a << 0;

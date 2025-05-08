@@ -165,7 +165,7 @@ main(i32 argc, char *argv[])
 		BeginDrawing();
 		BeginTextureMode(icon_texture);
 		ClearBackground(ctx.bg);
-		DrawCircleGradient(64, 64, 48, colour_from_normalized(hsv_to_rgb(ctx.colour)), ctx.bg);
+		DrawCircleGradient(64, 64, 48, rl_colour_from_normalized(hsv_to_rgb(ctx.colour)), ctx.bg);
 		DrawRing((Vector2){64, 64}, 45, 48, 0, 360, 128, SELECTOR_BORDER_COLOUR);
 		EndTextureMode();
 		EndDrawing();
@@ -193,7 +193,7 @@ main(i32 argc, char *argv[])
 	default:     ASSERT(0);                     break;
 	}
 
-	u32 packed_rgba = pack_rl_colour(colour_from_normalized(rgba));
+	u32 packed_rgba = pack_rl_colour(rl_colour_from_normalized(rgba));
 	printf("0x%08X|{.r = %0.03f, .g = %0.03f, .b = %0.03f, .a = %0.03f}\n",
 	       packed_rgba, rgba.r, rgba.g, rgba.b, rgba.a);
 
