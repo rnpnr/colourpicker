@@ -54,7 +54,7 @@ rdtsc(void)
 #endif
 
 #ifdef _DEBUG
-#define ASSERT(c) do { if (!(c)) debugbreak(); } while (0);
+#define ASSERT(c) do { if (!(c)) debugbreak(); } while (0)
 #define DEBUG_EXPORT
 #else
 #define ASSERT(c)
@@ -97,11 +97,11 @@ typedef union {
 	Rectangle rr;
 } Rect;
 
-enum colour_mode {
-	CM_RGB  = 0,
-	CM_HSV  = 1,
-	CM_LAST
-};
+typedef enum c{
+	ColourKind_RGB,
+	ColourKind_HSV,
+	ColourKind_Last,
+} ColourKind;
 
 enum colour_picker_mode {
 	CPM_PICKER   = 0,
@@ -109,10 +109,11 @@ enum colour_picker_mode {
 	CPM_LAST
 };
 
-enum colour_picker_flags {
-	CPF_REFILL_TEXTURE = 1 << 0,
-	CPF_PRINT_DEBUG    = 1 << 30,
-};
+typedef enum {
+	ColourPickerFlag_Ready         = 1 << 0,
+	ColourPickerFlag_RefillTexture = 1 << 1,
+	ColourPickerFlag_PrintDebug    = 1 << 30,
+} ColourPickerFlags;
 
 enum input_indices {
 	INPUT_HEX,
@@ -147,7 +148,7 @@ enum cardinal_direction { NORTH, EAST, SOUTH, WEST };
 
 #define RECT_BTN_BORDER_WIDTH  (SLIDER_BORDER_WIDTH + 3.0f)
 
-#define TEXT_HOVER_SPEED       5.0f
+#define HOVER_SPEED            5.0f
 
 typedef struct {
 	f32 hover_t;
@@ -197,22 +198,84 @@ typedef struct {
 } TextInputState;
 
 typedef struct {
+	str8 *labels;
+	u32   state;
+	u32   length;
+} Cycler;
+
+typedef struct Variable Variable;
+typedef enum {
+	InteractionKind_None,
+	InteractionKind_Set,
+	InteractionKind_Text,
+	InteractionKind_Drag,
+	InteractionKind_Scroll,
+} InteractionKind;
+
+typedef struct {
+	Variable *active;
+	Variable *hot;
+	Variable *next_hot;
+
+	Rect rect;
+	Rect hot_rect;
+
+	InteractionKind kind;
+} InteractionState;
+
+typedef enum {
+	VariableFlag_Text             = 1 << 0,
+	VariableFlag_UpdateStoredMode = 1 << 30,
+} VariableFlags;
+
+typedef enum {
+	VariableKind_F32,
+	VariableKind_U32,
+	VariableKind_F32Reference,
+	VariableKind_Button,
+	VariableKind_Cycler,
+	VariableKind_HexColourInput,
+} VariableKind;
+
+struct Variable {
+	union {
+		u32 U32;
+		f32 F32;
+		f32  *F32Reference;
+		void *generic;
+		Cycler  cycler;
+	};
+	VariableKind  kind;
+	VariableFlags flags;
+	f32           parameter;
+};
+
+typedef struct {
+	Variable colour_kind_cycler;
+} SliderModeState;
+
+typedef struct {
 	v4 colour, previous_colour;
 	ColourStackState colour_stack;
 
 	uv2 window_size;
 	v2  window_pos;
 	v2  mouse_pos;
+	v2  last_mouse;
 
 	Font  font;
 	Color bg, fg;
 
-	TextInputState  text_input_state;
+	TextInputState   text_input_state;
+	InteractionState interaction;
+
 	ModeChangeState mcs;
 	PickerModeState pms;
 	SliderState     ss;
 	StatusBarState  sbs;
 	ButtonState     buttons[2];
+
+	SliderModeState slider_mode_state;
 
 	s32 held_idx;
 
@@ -227,32 +290,24 @@ typedef struct {
 	s32 mode_id, colour_mode_id, colours_id;
 	s32 regions_id, radius_id, border_thick_id;
 
-	u32  flags;
-	enum colour_mode        colour_mode;
+	ColourPickerFlags flags;
+	ColourKind        stored_colour_kind;
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
 #define countof(a) (s64)(sizeof(a) / sizeof(*a))
 
-#define ABS(x)         ((x) < 0 ? (-x) : (x))
-#define MIN(a, b)      ((a) < (b) ? (a) : (b))
-#define MAX(a, b)      ((a) < (b) ? (b) : (a))
-#define CLAMP(x, a, b) ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
-#define CLAMP01(a)     CLAMP(a, 0, 1)
+#define ABS(x)           ((x) < 0 ? (-x) : (x))
+#define BETWEEN(x, a, b) ((x) >= (a) && (x) <= (b))
+#define MIN(a, b)        ((a) < (b) ? (a) : (b))
+#define MAX(a, b)        ((a) < (b) ? (b) : (a))
+#define CLAMP(x, a, b)   ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
+#define CLAMP01(a)       CLAMP(a, 0, 1)
 
 #define ISDIGIT(a)     ((a) >= '0' && (a) <= '9')
 #define ISHEX(a)       (ISDIGIT(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
 
-function Color
-rl_colour_from_normalized(v4 colour)
-{
-	Color result;
-	result.r = colour.r * 255;
-	result.g = colour.g * 255;
-	result.b = colour.b * 255;
-	result.a = colour.a * 255;
-	return result;
-}
+#define InvalidDefaultCase default: ASSERT(0); break
 
 function v4
 rgb_to_hsv(v4 rgb)
@@ -305,6 +360,26 @@ function u32
 pack_rl_colour(Color colour)
 {
 	return colour.r << 24 | colour.g << 16 | colour.b << 8 | colour.a << 0;
+}
+
+function Color
+rl_colour_from_normalized(v4 colour)
+{
+	Color result;
+	result.r = colour.r * 255;
+	result.g = colour.g * 255;
+	result.b = colour.b * 255;
+	result.a = colour.a * 255;
+	return result;
+}
+
+function v2
+add_v2(v2 a, v2 b)
+{
+	v2 result;
+	result.x = a.x + b.x;
+	result.y = a.y + b.y;
+	return result;
 }
 
 function u32

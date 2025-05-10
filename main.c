@@ -82,9 +82,9 @@ main(s32 argc, char *argv[])
 	ColourPickerCtx ctx = {
 		.window_size = { .w = 640, .h = 860 },
 
-		.mode        = CPM_PICKER,
-		.colour_mode = CM_HSV,
-		.flags       = CPF_REFILL_TEXTURE,
+		.mode               = CPM_PICKER,
+		.stored_colour_kind = ColourKind_HSV,
+		.flags              = ColourPickerFlag_RefillTexture,
 
 		.text_input_state = {.idx = -1, .cursor_t = 1, .cursor_t_target = 0},
 		.mcs = {.mode_visible_t = 1, .next_mode = -1},
@@ -185,10 +185,10 @@ main(s32 argc, char *argv[])
 	}
 
 	v4 rgba = {0};
-	switch (ctx.colour_mode) {
-	case CM_RGB: rgba = ctx.colour;             break;
-	case CM_HSV: rgba = hsv_to_rgb(ctx.colour); break;
-	default:     ASSERT(0);                     break;
+	switch (ctx.stored_colour_kind) {
+	case ColourKind_RGB: rgba = ctx.colour;             break;
+	case ColourKind_HSV: rgba = hsv_to_rgb(ctx.colour); break;
+	InvalidDefaultCase;
 	}
 
 	u32 packed_rgba = pack_rl_colour(rl_colour_from_normalized(rgba));
