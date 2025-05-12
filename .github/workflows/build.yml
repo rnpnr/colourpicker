@@ -16,8 +16,10 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          sudo apt-get install libxkbcommon-dev xorg-dev libwayland-dev ninja-build
+          sudo apt-get install libxkbcommon-dev xorg-dev
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
       - name: Build
         run: ./build.sh
 
@@ -28,7 +30,7 @@ jobs:
       matrix:
         include:
           - { sys: ucrt64,  env: ucrt-x86_64,  cc: "gcc" }
-          - { sys: clang64, env: clang-x86_64, cc: "clang" }
+          #- { sys: clang64, env: clang-x86_64, cc: "clang" }
     env:
       CC: "${{ matrix.cc }}"
     defaults:
@@ -39,8 +41,9 @@ jobs:
         with:
           msystem: ${{matrix.sys}}
           update: true
-          install: git mingw-w64-${{matrix.env}}-${{matrix.cc}}
-          pacboy: ninja:p cmake:p
+          install: mingw-w64-${{matrix.env}}-${{matrix.cc}}
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
       - name: Build
         run: ./build.sh

@@ -3,7 +3,7 @@
 version=1.0
 
 cflags=${CFLAGS:-"-march=native -O3"}
-cflags="${cflags} -std=c11 "
+cflags="${cflags} -std=c11"
 ldflags=${LDFLAGS}
 # TODO(rnp): embed shader without lto stripping it */
 ldflags="${ldflags} -fno-lto -lm"
@@ -19,6 +19,7 @@ for arg; do
 done
 
 machine=$(uname -m)
+mkdir -p out
 
 case $(uname -s) in
 MINGW64*)
@@ -45,9 +46,13 @@ build_raylib()
 	src=external/raylib/src
 	srcs="rcore rglfw rshapes rtext rtextures utils"
 
-	raylib_cmd="${cflags} -I./external/raylib/src -DPLATFORM_DESKTOP_GLFW"
+	raylib_cmd="${cflags} -Iexternal/raylib/src -Iexternal/raylib/src/external/glfw/include"
+	raylib_cmd="${raylib_cmd} -DPLATFORM_DESKTOP_GLFW"
 	raylib_cmd="${raylib_cmd} -Wno-unused-but-set-variable -Wno-unused-parameter"
 	[ ! ${w32} ] && raylib_cmd="${raylib_cmd} -D_GLFW_X11"
+
+	raylib_ldflags="-lm"
+	[ ${w32} ] && raylib_ldflags="${raylib_ldflags} -lgdi32 -lwinmm"
 
 	if [ ${debug} ]; then
 		files=""
@@ -57,12 +62,11 @@ build_raylib()
 		raylib_cmd="${raylib_cmd} -DBUILD_LIBTYPE_SHARED -D_GLFW_BUILD_DLL"
 		raylib_cmd="${raylib_cmd} -fPIC -shared"
 		raylib_cmd="${raylib_cmd} ${files} -o ${raylib}"
-		[ ${w32} ] && raylib_cmd="${raylib_command} -L. -lgdi32 -lwinmm"
-		${cc} ${raylib_cmd}
+		${cc} ${raylib_cmd} ${raylib_ldflags}
 	else
 		outs=""
 		for n in ${srcs}; do
-			${cc} ${raylib_cmd} -c "${src}/${n}.c" -o "out/${n}.o"
+			${cc} ${raylib_cmd} -c "${src}/${n}.c" -o "out/${n}.o" ${raylib_ldflags}
 			outs="${outs} out/${n}.o"
 		done
 
@@ -76,7 +80,6 @@ fi
 
 [ ! -s "config.h" ] && cp config.def.h config.h
 
-mkdir -p out
 raylib=out/libraylib.a
 [ ${debug} ] && raylib="libraylib.so"
 [ "./build.sh" -nt ${raylib} ] || [ ! -f ${raylib} ] && build_raylib
@@ -84,7 +87,7 @@ raylib=out/libraylib.a
 cflags="${cflags} -Wall -Wextra -Iout"
 
 if [ ! -s "out/lora_sb_0_inc.h" ] || [ "gen_incs.c" -nt "out/lora_sb_0_inc.h" ]; then
-	${cc} ${cflags} -o gen_incs gen_incs.c ${ldflags} ${raylib} && ./gen_incs
+	${cc} ${cflags} -o gen_incs gen_incs.c ${raylib} ${ldflags} && ./gen_incs
 fi
 
 if [ "$debug" ]; then
