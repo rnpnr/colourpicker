@@ -16,8 +16,11 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          sudo apt-get install libxkbcommon-dev xorg-dev libwayland-dev ninja-build
+          sudo apt update
+          sudo apt install libxkbcommon-dev xorg-dev
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
       - name: Build
         run: ./build.sh
 
@@ -40,7 +43,8 @@ jobs:
           msystem: ${{matrix.sys}}
           update: true
           install: git mingw-w64-${{matrix.env}}-${{matrix.cc}}
-          pacboy: ninja:p cmake:p
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
       - name: Build
         run: ./build.sh

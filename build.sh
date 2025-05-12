@@ -45,7 +45,8 @@ build_raylib()
 	src=external/raylib/src
 	srcs="rcore rglfw rshapes rtext rtextures utils"
 
-	raylib_cmd="${cflags} -I./external/raylib/src -DPLATFORM_DESKTOP_GLFW"
+	raylib_cmd="${cflags} -I./external/raylib/src -Iexternal/raylib/src/external/glfw/include"
+	raylib_cmd="${raylib_cmd} -DPLATFORM_DESKTOP_GLFW"
 	raylib_cmd="${raylib_cmd} -Wno-unused-but-set-variable -Wno-unused-parameter"
 	[ ! ${w32} ] && raylib_cmd="${raylib_cmd} -D_GLFW_X11"
 
@@ -84,7 +85,7 @@ raylib=out/libraylib.a
 cflags="${cflags} -Wall -Wextra -Iout"
 
 if [ ! -s "out/lora_sb_0_inc.h" ] || [ "gen_incs.c" -nt "out/lora_sb_0_inc.h" ]; then
-	${cc} ${cflags} -o gen_incs gen_incs.c ${ldflags} ${raylib} && ./gen_incs
+	${cc} ${cflags} -o gen_incs gen_incs.c ${raylib} ${ldflags} && ./gen_incs
 fi
 
 if [ "$debug" ]; then

@@ -24,8 +24,9 @@ jobs:
           msystem: clang64
           update: true
           install: git mingw-w64-clang-x86_64-clang
-          pacboy: ninja:p cmake:p
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
 
       - name: Build
         run: ./build.sh
