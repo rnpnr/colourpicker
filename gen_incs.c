@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #define ISSPACE(a)  ((a) == ' ' || (a) == '\t')
 
 function str8
@@ -129,6 +128,35 @@ export_font_as_code(char *font_path, char *output_name, int font_size, str8 mem)
 	fclose(fp);
 }
 
+function void
+generate_shader_include(str8 memory)
+{
+	str8 raw = read_whole_file(HSV_LERP_SHADER_NAME, &memory);
+	// NOTE(rnp): raylib is dumb and wants this to be 0 terminated
+	raw.data[raw.length++] = 0;
+
+	char *output_name = "out/shader_inc.h";
+	FILE *fp = fopen(output_name, "w");
+	if (fp == NULL) {
+		printf("Failed to open output font file: %s\n", output_name);
+		exit(1);
+	}
+
+	fprintf(fp, "/* See LICENSE for copyright details */\n\n");
+	fprintf(fp, "// GENERATED CODE\n\n");
+	fprintf(fp, "read_only global u8 slider_lerp_bytes[] = {\n");
+	for (s64 i = 0; i < raw.length; i++) {
+		b32 end_line = (i != 0) && (i % 16) == 0;
+		if (i != 0) fprintf(fp, end_line ? "," : ", ");
+		if (end_line) fprintf(fp, "\n");
+		if ((i % 16) == 0) fprintf(fp, "\t");
+		fprintf(fp, "0x%02X", raw.data[i]);
+	}
+	fprintf(fp, ", 0x00\n");
+	fprintf(fp, "\n};\n");
+	fclose(fp);
+}
+
 extern s32
 main(void)
 {
@@ -145,6 +173,8 @@ main(void)
 		rmem.data   += (tlen + 1);
 		export_font_as_code("assets/Lora-SemiBold.ttf", (char *)tmem.data, font_sizes[i], rmem);
 	}
+
+	generate_shader_include(smem);
 
 	return 0;
 }

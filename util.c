@@ -9,12 +9,8 @@
 
 #include "lora_sb_0_inc.h"
 #include "lora_sb_1_inc.h"
+#include "shader_inc.h"
 #include "config.h"
-
-/* NOTE(rnp): symbols in release builds shaders are embedded in the binary */
-#ifndef _DEBUG
-extern char _binary_slider_lerp_glsl_start[];
-#endif
 
 #define fmod_f32(a, b) __builtin_fmodf((a), (b))
 

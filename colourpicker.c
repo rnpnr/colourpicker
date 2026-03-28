@@ -1167,7 +1167,7 @@ colour_picker_init(ColourPickerCtx *ctx)
 #ifdef _DEBUG
 	ctx->picker_shader   = LoadShader(0, HSV_LERP_SHADER_NAME);
 #else
-	ctx->picker_shader   = LoadShaderFromMemory(0, _binary_slider_lerp_glsl_start);
+	ctx->picker_shader   = LoadShaderFromMemory(0, (char *)slider_lerp_bytes);
 #endif
 	ctx->mode_id         = GetShaderLocation(ctx->picker_shader, "u_mode");
 	ctx->colour_mode_id  = GetShaderLocation(ctx->picker_shader, "u_colour_mode");

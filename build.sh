@@ -4,9 +4,7 @@ version=1.0
 
 cflags=${CFLAGS:-"-march=native -O3"}
 cflags="${cflags} -std=c11 "
-ldflags=${LDFLAGS}
-# TODO(rnp): embed shader without lto stripping it */
-ldflags="${ldflags} -fno-lto -lm"
+ldflags="${LDFLAGS} -flto -lm"
 
 output="colourpicker"
 
@@ -18,7 +16,7 @@ for arg; do
 	esac
 done
 
-machine=$(uname -m)
+mkdir -p out
 
 case $(uname -s) in
 MINGW64*)
@@ -26,16 +24,6 @@ MINGW64*)
 	output="Colour Picker"
 	windres assets/colourpicker.rc out/colourpicker.rc.o
 	ldflags="out/colourpicker.rc.o ${ldflags} -mwindows -lgdi32 -lwinmm"
-	case ${machine} in
-	x86_64) binary_format="pe-x86-64"     ;;
-	*)      binary_format="pe-${machine}" ;;
-	esac
-	;;
-*)
-	case ${machine} in
-	aarch64) binary_format="elf64-littleaarch64" ;;
-	x86_64)  binary_format="elf64-x86-64"  ;;
-	esac
 	;;
 esac
 
@@ -77,7 +65,6 @@ fi
 
 [ ! -s "config.h" ] && cp config.def.h config.h
 
-mkdir -p out
 raylib=out/libraylib.a
 [ ${debug} ] && raylib="libraylib.so"
 [ "./build.sh" -nt ${raylib} ] || [ ! -f ${raylib} ] && build_raylib
@@ -95,10 +82,7 @@ if [ "$debug" ]; then
 	${cc} ${cflags} -fPIC -shared colourpicker.c -o colourpicker.so
 	ldflags="${ldflags} -Wl,-rpath,. ${raylib}"
 else
-	if [ ! -s "out/slider_lerp.o" ] || [ "slider_lerp.glsl" -nt "out/slider_lerp.o" ]; then
-		objcopy --input-target=binary slider_lerp.glsl --output-target=${binary_format} out/slider_lerp.o
-	fi
-	ldflags="${raylib} out/slider_lerp.o ${ldflags}"
+	ldflags="${raylib} ${ldflags}"
 fi
 
 ${cc} ${cflags} -DVERSION="\"${version}\"" main.c -o "${output}" ${ldflags}
