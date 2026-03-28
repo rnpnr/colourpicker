@@ -66,6 +66,29 @@ typedef union {
 	Rectangle rr;
 } Rect;
 
+typedef enum {
+	NumberConversionResult_Invalid,
+	NumberConversionResult_OutOfRange,
+	NumberConversionResult_Success,
+} NumberConversionResult;
+
+typedef enum {
+	NumberConversionKind_Invalid,
+	NumberConversionKind_Integer,
+	NumberConversionKind_Float,
+} NumberConversionKind;
+
+typedef struct {
+	NumberConversionResult result;
+	NumberConversionKind   kind;
+	union {
+		u64 U64;
+		s64 S64;
+		f64 F64;
+	};
+	str8 unparsed;
+} NumberConversion;
+
 typedef enum c{
 	ColourKind_RGB,
 	ColourKind_HSV,
@@ -264,7 +287,7 @@ typedef struct {
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
-#define ISHEX(a)       (IsDigit(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
+#define IsHex(a) (IsDigit(a) || Between((a), 'a', 'f') || Between((a), 'A', 'F'))
 
 function v4
 rgb_to_hsv(v4 rgb)
@@ -339,101 +362,158 @@ add_v2(v2 a, v2 b)
 	return result;
 }
 
-function u32
-parse_hex_u32(str8 s)
+function NumberConversion
+integer_from_str8(str8 raw, b32 hex)
 {
-	u32 res = 0;
+	read_only local_persist alignas(64) s8 lut[64] = {
+		 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,
+		-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	};
 
-	/* NOTE: skip over '0x' or '0X' */
-	if (s.length > 2 && s.data[0] == '0' && (s.data[1] == 'x' || s.data[1] == 'X')) {
-		s.data   += 2;
-		s.length -= 2;
+	NumberConversion result = {.unparsed = raw};
+
+	s64 i     = 0;
+	s64 scale = 1;
+	if (raw.length > 0 && raw.data[0] == '-') {
+		scale = -1;
+		i     =  1;
 	}
 
-	for (; s.length > 0; s.length--, s.data++) {
-		res <<= 4;
-		if (IsDigit(*s.data)) {
-			res |= *s.data - '0';
-		} else if (ISHEX(*s.data)) {
-			/* NOTE: convert to lowercase first then convert to value */
-			*s.data |= 0x20;
-			res     |= *s.data - 0x57;
-		} else {
-			/* NOTE: do nothing (treat invalid value as 0) */
-		}
-	}
-	return res;
-}
-
-function f64
-parse_f64(str8 s)
-{
-	f64 integral = 0, fractional = 0, sign = 1;
-
-	if (s.length && *s.data == '-') {
-		sign *= -1;
-		s.data++;
-		s.length--;
+	if (raw.length - i > 2 && raw.data[i] == '0' && (raw.data[1] == 'x' || raw.data[1] == 'X')) {
+		hex = 1;
+		i += 2;
 	}
 
-	while (s.length && IsDigit(*s.data)) {
-		integral *= 10;
-		integral += *s.data - '0';
-		s.data++;
-		s.length--;
-	}
+	#define integer_conversion_body(radix, clamp) do {\
+		for (; i < raw.length; i++) {\
+			s64 value = lut[Min((u8)(raw.data[i] - (u8)'0'), clamp)];\
+			if (value >= 0) {\
+				if (result.U64 > (U64_MAX - (u64)value) / radix) {\
+					result.result = NumberConversionResult_OutOfRange;\
+					result.U64    = U64_MAX;\
+					return result;\
+				} else {\
+					result.U64 = radix * result.U64 + (u64)value;\
+				}\
+			} else {\
+				break;\
+			}\
+		}\
+	} while (0)
 
-	if (s.length && *s.data == '.') { s.data++; s.length--; }
+	if (hex) integer_conversion_body(16u, 63u);
+	else     integer_conversion_body(10u, 15u);
 
-	while (s.length) {
-		assert(s.data[s.length - 1] != '.');
-		fractional *= 0.1f;
-		fractional += (s.data[--s.length] - '0') * 0.1f;
-	}
+	#undef integer_conversion_body
 
-	f64 result = sign * (integral + fractional);
+	result.unparsed = (str8){.length = raw.length - i, .data = raw.data + i};
+	result.result   = i > 0 ? NumberConversionResult_Success : NumberConversionResult_Invalid;
+	result.kind     = NumberConversionKind_Integer;
+	if (scale < 0) result.U64 = 0 - result.U64;
 
 	return result;
+}
+
+function NumberConversion
+number_from_str8(str8 s)
+{
+	NumberConversion result  = {.unparsed = s};
+	NumberConversion integer = integer_from_str8(s, 0);
+	if (integer.result == NumberConversionResult_Success) {
+		if (integer.unparsed.length != 0 && integer.unparsed.data[0] == '.') {
+			s = integer.unparsed;
+			s.data++;
+			s.length--;
+
+			while (s.length > 0 && s.data[s.length - 1] == '0') s.length--;
+
+			NumberConversion fractional = integer_from_str8(s, 0);
+			if (fractional.result == NumberConversionResult_Success || s.length == 0) {
+				result.F64 = (f64)fractional.U64;
+
+				u64 divisor = (u64)(fractional.unparsed.data - s.data);
+				while (divisor > 0) { result.F64 /= 10.0; divisor--; }
+
+				result.F64 += (f64)integer.S64;
+
+				result.result   = NumberConversionResult_Success;
+				result.kind     = NumberConversionKind_Float;
+				result.unparsed = fractional.unparsed;
+			}
+		} else {
+			result = integer;
+		}
+	}
+	return result;
+}
+
+function void
+stream_append(Stream *s, void *data, s64 count)
+{
+	s->errors |= (s->cap - s->widx) < count;
+	if (!s->errors) {
+		memory_copy(s->data + s->widx, data, count);
+		s->widx += (s32)count;
+	}
 }
 
 function void
 stream_append_byte(Stream *s, u8 b)
 {
-	s->errors |= s->widx + 1 > s->cap;
-	if (!s->errors)
-		s->data[s->widx++] = b;
+	stream_append(s, &b, 1);
 }
 
 function void
-stream_append_hex_u8(Stream *s, u32 n)
+stream_append_hex_u64_width(Stream *s, u64 n, s64 width)
 {
-	local_persist u8 hex[16] = {"0123456789abcdef"};
-	s->errors |= (s->cap - s->widx) < 2;
+	assert(width <= 16);
 	if (!s->errors) {
-		s->data[s->widx + 1] = hex[(n >> 0) & 0x0f];
-		s->data[s->widx + 0] = hex[(n >> 4) & 0x0f];
-		s->widx += 2;
+		u8  buf[16];
+		u8 *end = buf + sizeof(buf);
+		u8 *beg = end;
+		while (n) {
+			*--beg = (u8)"0123456789abcdef"[n & 0x0F];
+			n >>= 4;
+		}
+		while (end - beg < width)
+			*--beg = '0';
+		stream_append(s, beg, end - beg);
 	}
+}
+
+function void
+stream_append_hex_u64(Stream *s, u64 n)
+{
+	stream_append_hex_u64_width(s, n, 2);
 }
 
 function void
 stream_append_str8(Stream *s, str8 str)
 {
-	s->errors |= (s->cap - s->widx) < str.length;
-	if (!s->errors) {
-		for (s64 i = 0; i < str.length; i++)
-			s->data[s->widx++] = str.data[i];
-	}
+	stream_append(s, str.data, str.length);
+}
+
+function void
+stream_append_u64_width(Stream *s, u64 n, s64 width)
+{
+	u8 tmp[64];
+	u8 *end = tmp + countof(tmp);
+	u8 *beg = end;
+	width = Min((s64)countof(tmp), width);
+
+	do { *--beg = (u8)('0' + (n % 10)); } while (n /= 10);
+	while (end - beg > 0 && (end - beg) < width)
+		*--beg = '0';
+
+	stream_append(s, beg, end - beg);
 }
 
 function void
 stream_append_u64(Stream *s, u64 n)
 {
-	u8 tmp[64];
-	u8 *end = tmp + sizeof(tmp);
-	u8 *beg = end;
-	do { *--beg = '0' + (n % 10); } while (n /= 10);
-	stream_append_str8(s, (str8){.length = end - beg, .data = beg});
+	stream_append_u64_width(s, n, 0);
 }
 
 function void
@@ -465,10 +545,10 @@ stream_append_f64(Stream *s, f64 f, s64 prec)
 function void
 stream_append_colour(Stream *s, Color c)
 {
-	stream_append_hex_u8(s, c.r);
-	stream_append_hex_u8(s, c.g);
-	stream_append_hex_u8(s, c.b);
-	stream_append_hex_u8(s, c.a);
+	stream_append_hex_u64(s, c.r);
+	stream_append_hex_u64(s, c.g);
+	stream_append_hex_u64(s, c.b);
+	stream_append_hex_u64(s, c.a);
 }
 
 #endif /* _UTIL_C_ */

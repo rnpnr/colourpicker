@@ -67,8 +67,10 @@ do_debug(void)
 
 #endif /* _DEBUG */
 
-function void __attribute__((noreturn))
-usage(char *argv0)
+global const char *argv0;
+
+function no_return void
+usage(void)
 {
 	printf("usage: %s [-h ????????] [-r ?.??] [-g ?.??] [-b ?.??] [-a ?.??]\n"
 	       "\t-h:          Hexadecimal Colour\n"
@@ -76,9 +78,27 @@ usage(char *argv0)
 	exit(1);
 }
 
+function f64
+try_read_f64(str8 s)
+{
+	f64 result = 0;
+	NumberConversion number = number_from_str8(s);
+	if (number.result != NumberConversionResult_Success) {
+		printf("invalid float colour literal: %.*s\n", (s32)s.length, s.data);
+		usage();
+	}
+
+	if (number.kind == NumberConversionKind_Float) result = number.F64;
+	else                                           result = (f64)number.S64;
+
+	return result;
+}
+
 extern s32
 main(s32 argc, char *argv[])
 {
+	argv0 = argv[0];
+
 	ColourPickerCtx ctx = {
 		.window_size = { .w = 640, .h = 860 },
 
@@ -122,24 +142,29 @@ main(s32 argc, char *argv[])
 					printf("colour picker %s\n", VERSION);
 					return 0;
 				}
-				if (argv[i + 1] == NULL ||
-				    (argv[i][1] == 'h' && !ISHEX(argv[i + 1][0])))
-					usage(argv[0]);
+				if (argv[i + 1] == 0 || (argv[i][1] == 'h' && !IsHex(argv[i + 1][0])))
+					usage();
 
 				switch (argv[i][1]) {
-				case 'h':
-					rgb = normalize_colour(parse_hex_u32(str8_from_c_str(argv[i + 1])));
+				case 'h':{
+					NumberConversion number = integer_from_str8(str8_from_c_str(argv[i + 1]), 1);
+					if (number.result == NumberConversionResult_Success) {
+						rgb = normalize_colour(number.U64);
+					} else {
+						printf("invalid hexadecimal colour: %s\n", argv[i + 1]);
+						usage();
+					}
 					ctx.colour = rgb_to_hsv(rgb);
-					break;
-				case 'r':{rgb.r = parse_f64(str8_from_c_str(argv[i + 1])); rgb.r = Clamp01(rgb.r);}break;
-				case 'g':{rgb.g = parse_f64(str8_from_c_str(argv[i + 1])); rgb.g = Clamp01(rgb.g);}break;
-				case 'b':{rgb.b = parse_f64(str8_from_c_str(argv[i + 1])); rgb.b = Clamp01(rgb.b);}break;
-				case 'a':{rgb.a = parse_f64(str8_from_c_str(argv[i + 1])); rgb.a = Clamp01(rgb.a);}break;
-				default:{usage(argv[0]);}break;
+				}break;
+				case 'r':{rgb.r = try_read_f64(str8_from_c_str(argv[i + 1])); rgb.r = Clamp01(rgb.r);}break;
+				case 'g':{rgb.g = try_read_f64(str8_from_c_str(argv[i + 1])); rgb.g = Clamp01(rgb.g);}break;
+				case 'b':{rgb.b = try_read_f64(str8_from_c_str(argv[i + 1])); rgb.b = Clamp01(rgb.b);}break;
+				case 'a':{rgb.a = try_read_f64(str8_from_c_str(argv[i + 1])); rgb.a = Clamp01(rgb.a);}break;
+				default:{usage();}break;
 				}
 				i++;
 			} else {
-				usage(argv[0]);
+				usage();
 			}
 		}
 		ctx.colour          = rgb_to_hsv(rgb);

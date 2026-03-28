@@ -312,19 +312,28 @@ parse_and_store_text_input(ColourPickerCtx *ctx)
 	if (ctx->text_input_state.idx == -1) {
 		return;
 	} else if (ctx->text_input_state.idx == INPUT_HEX) {
-		new_colour = normalize_colour(parse_hex_u32(input));
-		new_mode   = ColourKind_RGB;
+		NumberConversion number = integer_from_str8(input, 1);
+		if (number.result == NumberConversionResult_Success) {
+			new_colour = normalize_colour(number.U64);
+			new_mode   = ColourKind_RGB;
+		}
 	} else {
-		new_mode   = ctx->stored_colour_kind;
-		new_colour = ctx->colour;
-		f32 fv = parse_f64(input);
-		fv = Clamp01(fv);
-		switch(ctx->text_input_state.idx) {
-		case INPUT_R: new_colour.r = fv; break;
-		case INPUT_G: new_colour.g = fv; break;
-		case INPUT_B: new_colour.b = fv; break;
-		case INPUT_A: new_colour.a = fv; break;
-		default: break;
+		NumberConversion number = number_from_str8(input);
+		if (number.result == NumberConversionResult_Success) {
+			new_mode   = ctx->stored_colour_kind;
+			new_colour = ctx->colour;
+
+			f32 fv;
+			if (number.kind == NumberConversionKind_Float) fv = number.F64;
+			else                                           fv = (f32)number.S64;
+			fv = Clamp01(fv);
+			switch(ctx->text_input_state.idx) {
+			case INPUT_R: new_colour.r = fv; break;
+			case INPUT_G: new_colour.g = fv; break;
+			case INPUT_B: new_colour.b = fv; break;
+			case INPUT_A: new_colour.a = fv; break;
+			default: break;
+			}
 		}
 	}
 
@@ -1378,12 +1387,15 @@ do_colour_picker(ColourPickerCtx *ctx, f32 dt, Vector2 window_pos, Vector2 mouse
 		if (do_text_button(ctx, ctx->buttons + 1, ctx->mouse_pos, btn_r, str8("Paste"), fg, bg)) {
 			str8 txt = str8_from_c_str((char *)GetClipboardText());
 			if (txt.length) {
-				v4 new_colour = normalize_colour(parse_hex_u32(txt));
-				ctx->colour = convert_colour(new_colour, ColourKind_RGB, ctx->stored_colour_kind);
-				if (ctx->mode == CPM_PICKER) {
-					f32 hue = get_formatted_colour(ctx, ColourKind_HSV).x;
-					ctx->pms.base_hue       = hue;
-					ctx->pms.fractional_hue = 0;
+				NumberConversion number = integer_from_str8(txt, 1);
+				if (number.result == NumberConversionResult_Success) {
+					v4 new_colour = normalize_colour(number.U64);
+					ctx->colour = convert_colour(new_colour, ColourKind_RGB, ctx->stored_colour_kind);
+					if (ctx->mode == CPM_PICKER) {
+						f32 hue = get_formatted_colour(ctx, ColourKind_HSV).x;
+						ctx->pms.base_hue       = hue;
+						ctx->pms.fractional_hue = 0;
+					}
 				}
 			}
 		}
