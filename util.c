@@ -1,22 +1,11 @@
 /* See LICENSE for copyright details */
 #ifndef _UTIL_C_
 #define _UTIL_C_
-#include <stddef.h>
-#include <stdint.h>
 
-typedef uint8_t   u8;
-typedef int32_t   s32;
-typedef uint32_t  u32;
-typedef uint32_t  b32;
-typedef int64_t   s64;
-typedef uint64_t  u64;
-typedef float     f32;
-typedef double    f64;
-typedef ptrdiff_t sz;
-
-#define function      static
-#define global        static
-#define local_persist static
+#include "rstd_compiler.h"
+#include "rstd_intrinsics.h"
+#include "rstd_types.h"
+#include "rstd_core.h"
 
 #include "lora_sb_0_inc.h"
 #include "lora_sb_1_inc.h"
@@ -27,18 +16,10 @@ typedef ptrdiff_t sz;
 extern char _binary_slider_lerp_glsl_start[];
 #endif
 
-#ifndef asm
-#define asm __asm__
-#endif
-
-#define FORCE_INLINE inline __attribute__((always_inline))
-
 #define fmod_f32(a, b) __builtin_fmodf((a), (b))
 
-#ifdef __ARM_ARCH_ISA_A64
-#define debugbreak() asm volatile ("brk 0xf000")
-
-function FORCE_INLINE u64
+#if ARCH_ARM64
+function force_inline u64
 rdtsc(void)
 {
 	register u64 cntvct asm("x0");
@@ -46,23 +27,15 @@ rdtsc(void)
 	return cntvct;
 }
 
-#elif __x86_64__
-#include <immintrin.h>
-#define debugbreak() asm volatile ("int3; nop")
-
+#elif ARCH_X64
 #define rdtsc() __rdtsc()
 #endif
 
 #ifdef _DEBUG
-#define ASSERT(c) do { if (!(c)) debugbreak(); } while (0)
 #define DEBUG_EXPORT
 #else
-#define ASSERT(c)
 #define DEBUG_EXPORT function
 #endif
-
-typedef struct { sz len; u8 *data; } str8;
-#define str8(s) (str8){.len = sizeof(s) - 1, .data = (u8 *)s}
 
 typedef struct {
 	u8  *data;
@@ -295,26 +268,14 @@ typedef struct {
 	enum colour_picker_mode mode;
 } ColourPickerCtx;
 
-#define countof(a) (s64)(sizeof(a) / sizeof(*a))
-
-#define ABS(x)           ((x) < 0 ? (-x) : (x))
-#define BETWEEN(x, a, b) ((x) >= (a) && (x) <= (b))
-#define MIN(a, b)        ((a) < (b) ? (a) : (b))
-#define MAX(a, b)        ((a) < (b) ? (b) : (a))
-#define CLAMP(x, a, b)   ((x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x))
-#define CLAMP01(a)       CLAMP(a, 0, 1)
-
-#define ISDIGIT(a)     ((a) >= '0' && (a) <= '9')
-#define ISHEX(a)       (ISDIGIT(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
-
-#define InvalidDefaultCase default: ASSERT(0); break
+#define ISHEX(a)       (IsDigit(a) || ((a) >= 'a' && (a) <= 'f') || ((a) >= 'A' && (a) <= 'F'))
 
 function v4
 rgb_to_hsv(v4 rgb)
 {
 	v4 hsv = {0};
-	f32 M = MAX(rgb.r, MAX(rgb.g, rgb.b));
-	f32 m = MIN(rgb.r, MIN(rgb.g, rgb.b));
+	f32 M = Max(rgb.r, Max(rgb.g, rgb.b));
+	f32 m = Min(rgb.r, Min(rgb.g, rgb.b));
 	if (M - m > 0) {
 		f32 C = M - m;
 		if (M == rgb.r) {
@@ -336,11 +297,11 @@ hsv_to_rgb(v4 hsv)
 {
 	v4 rgba;
 	f32 k  = fmod_f32(5 + hsv.x * 6, 6);
-	rgba.r = hsv.z - hsv.z * hsv.y * MAX(0, MIN(1, MIN(k, 4 - k)));
+	rgba.r = hsv.z - hsv.z * hsv.y * Max(0, Min(1, Min(k, 4 - k)));
 	k      = fmod_f32(3 + hsv.x * 6, 6);
-	rgba.g = hsv.z - hsv.z * hsv.y * MAX(0, MIN(1, MIN(k, 4 - k)));
+	rgba.g = hsv.z - hsv.z * hsv.y * Max(0, Min(1, Min(k, 4 - k)));
 	k      = fmod_f32(1 + hsv.x * 6, 6);
-	rgba.b = hsv.z - hsv.z * hsv.y * MAX(0, MIN(1, MIN(k, 4 - k)));
+	rgba.b = hsv.z - hsv.z * hsv.y * Max(0, Min(1, Min(k, 4 - k)));
 	rgba.a = hsv.a;
 	return rgba;
 }
@@ -388,14 +349,14 @@ parse_hex_u32(str8 s)
 	u32 res = 0;
 
 	/* NOTE: skip over '0x' or '0X' */
-	if (s.len > 2 && s.data[0] == '0' && (s.data[1] == 'x' || s.data[1] == 'X')) {
-		s.data += 2;
-		s.len  -= 2;
+	if (s.length > 2 && s.data[0] == '0' && (s.data[1] == 'x' || s.data[1] == 'X')) {
+		s.data   += 2;
+		s.length -= 2;
 	}
 
-	for (; s.len > 0; s.len--, s.data++) {
+	for (; s.length > 0; s.length--, s.data++) {
 		res <<= 4;
-		if (ISDIGIT(*s.data)) {
+		if (IsDigit(*s.data)) {
 			res |= *s.data - '0';
 		} else if (ISHEX(*s.data)) {
 			/* NOTE: convert to lowercase first then convert to value */
@@ -413,40 +374,29 @@ parse_f64(str8 s)
 {
 	f64 integral = 0, fractional = 0, sign = 1;
 
-	if (s.len && *s.data == '-') {
+	if (s.length && *s.data == '-') {
 		sign *= -1;
 		s.data++;
-		s.len--;
+		s.length--;
 	}
 
-	while (s.len && ISDIGIT(*s.data)) {
+	while (s.length && IsDigit(*s.data)) {
 		integral *= 10;
 		integral += *s.data - '0';
 		s.data++;
-		s.len--;
+		s.length--;
 	}
 
-	if (s.len && *s.data == '.') { s.data++; s.len--; }
+	if (s.length && *s.data == '.') { s.data++; s.length--; }
 
-	while (s.len) {
-		ASSERT(s.data[s.len - 1] != '.');
+	while (s.length) {
+		assert(s.data[s.length - 1] != '.');
 		fractional *= 0.1f;
-		fractional += (s.data[--s.len] - '0') * 0.1f;
+		fractional += (s.data[--s.length] - '0') * 0.1f;
 	}
 
 	f64 result = sign * (integral + fractional);
 
-	return result;
-}
-
-function str8
-str8_from_c_str(char *s)
-{
-	str8 result = {.data = (u8 *)s};
-	if (s) {
-		while (*s) s++;
-		result.len = (u8 *)s - result.data;
-	}
 	return result;
 }
 
@@ -473,9 +423,9 @@ stream_append_hex_u8(Stream *s, u32 n)
 function void
 stream_append_str8(Stream *s, str8 str)
 {
-	s->errors |= (s->cap - s->widx) < str.len;
+	s->errors |= (s->cap - s->widx) < str.length;
 	if (!s->errors) {
-		for (sz i = 0; i < str.len; i++)
+		for (s64 i = 0; i < str.length; i++)
 			s->data[s->widx++] = str.data[i];
 	}
 }
@@ -487,7 +437,7 @@ stream_append_u64(Stream *s, u64 n)
 	u8 *end = tmp + sizeof(tmp);
 	u8 *beg = end;
 	do { *--beg = '0' + (n % 10); } while (n /= 10);
-	stream_append_str8(s, (str8){.len = end - beg, .data = beg});
+	stream_append_str8(s, (str8){.length = end - beg, .data = beg});
 }
 
 function void

@@ -1,23 +1,25 @@
 #include <raylib.h>
 
+#include "rstd_compiler.h"
+#include "rstd_intrinsics.h"
+#include "rstd_types.h"
+#include "rstd_core.h"
+
+#include "config.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
-
-#define function static
 
 #define ISSPACE(a)  ((a) == ' ' || (a) == '\t')
-
-typedef struct {uint8_t *data; ptrdiff_t len;} str8;
 
 function str8
 read_whole_file(char *name, str8 *mem)
 {
-	str8 res = {0};
+	str8 result = {0};
 	FILE *fp = fopen(name, "r");
 
 	if (!fp) {
@@ -26,34 +28,34 @@ read_whole_file(char *name, str8 *mem)
 	}
 
 	fseek(fp, 0, SEEK_END);
-	res.len = ftell(fp);
+	result.length = ftell(fp);
 	rewind(fp);
 
-	if (mem->len < res.len) {
+	if (mem->length < result.length) {
 		fputs("Not enough space for reading file!\n", stdout);
 		exit(1);
 	}
-	res.data = mem->data;
-	res.len  = fread(res.data, 1, res.len, fp);
+	result.data   = mem->data;
+	result.length = fread(result.data, 1, result.length, fp);
 	fclose(fp);
 
-	mem->data += res.len;
-	mem->len  -= res.len;
+	mem->data   += result.length;
+	mem->length -= result.length;
 
-	return res;
+	return result;
 }
 
 /* NOTE: modified from raylib */
 function void
 export_font_as_code(char *font_path, char *output_name, int font_size, str8 mem)
 {
-	str8 raw            = read_whole_file(font_path, &mem);
+	str8 raw          = read_whole_file(font_path, &mem);
 	Font font         = {0};
 	font.baseSize     = font_size;
 	font.glyphCount   = 95;
 	font.glyphPadding = 4;
 
-	font.glyphs = LoadFontData(raw.data, raw.len, font.baseSize, 0, font.glyphCount, FONT_DEFAULT);
+	font.glyphs = LoadFontData(raw.data, raw.length, font.baseSize, 0, font.glyphCount, FONT_DEFAULT);
 	if (font.glyphs == NULL) {
 		printf("Failed to load font data: %s\n", font_path);
 		exit(1);
@@ -127,19 +129,19 @@ export_font_as_code(char *font_path, char *output_name, int font_size, str8 mem)
 	fclose(fp);
 }
 
-int
+extern s32
 main(void)
 {
-	static uint8_t mem[2u * 1024u * 1024u];
-	str8 smem = {.data = mem, .len = sizeof(mem)};
+	local_persist u8 mem[2u * 1024u * 1024u];
+	str8 smem = {.data = mem, .length = sizeof(mem)};
 
 	SetTraceLogLevel(LOG_NONE);
 	int font_sizes[] = { FONT_SIZE, FONT_SIZE/2 };
 	for (unsigned int i = 0; i < sizeof(font_sizes)/sizeof(*font_sizes); i++) {
 		str8 tmem = smem;
 		str8 rmem = smem;
-		size_t tlen  = snprintf((char *)tmem.data, tmem.len, "out/lora_sb_%d_inc.h", i);
-		rmem.len    -= (tlen + 1);
+		size_t tlen  = snprintf((char *)tmem.data, tmem.length, "out/lora_sb_%d_inc.h", i);
+		rmem.length -= (tlen + 1);
 		rmem.data   += (tlen + 1);
 		export_font_as_code("assets/Lora-SemiBold.ttf", (char *)tmem.data, font_sizes[i], rmem);
 	}

@@ -131,11 +131,11 @@ main(s32 argc, char *argv[])
 					rgb = normalize_colour(parse_hex_u32(str8_from_c_str(argv[i + 1])));
 					ctx.colour = rgb_to_hsv(rgb);
 					break;
-				case 'r': rgb.r = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.r); break;
-				case 'g': rgb.g = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.g); break;
-				case 'b': rgb.b = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.b); break;
-				case 'a': rgb.a = parse_f64(str8_from_c_str(argv[i + 1])); CLAMP01(rgb.a); break;
-				default:  usage(argv[0]);                                 break;
+				case 'r':{rgb.r = parse_f64(str8_from_c_str(argv[i + 1])); rgb.r = Clamp01(rgb.r);}break;
+				case 'g':{rgb.g = parse_f64(str8_from_c_str(argv[i + 1])); rgb.g = Clamp01(rgb.g);}break;
+				case 'b':{rgb.b = parse_f64(str8_from_c_str(argv[i + 1])); rgb.b = Clamp01(rgb.b);}break;
+				case 'a':{rgb.a = parse_f64(str8_from_c_str(argv[i + 1])); rgb.a = Clamp01(rgb.a);}break;
+				default:{usage(argv[0]);}break;
 				}
 				i++;
 			} else {
